@@ -1,0 +1,7 @@
+project_id = "aaiehsxiodbmwhykqqcn"
+
+[functions.analyze-bill]
+verify_jwt = true
+
+[functions.snap-solve]
+verify_jwt = true
