@@ -214,6 +214,8 @@ serve(async (req) => {
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const rawModel = Deno.env.get('GEMINI_MODEL');
+    const GEMINI_MODEL = (rawModel ? rawModel.trim() : 'gemini-1.5-flash');
 
     if (!GEMINI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('Missing required environment variables (GEMINI_API_KEY, SUPABASE_URL, or SUPABASE_SERVICE_ROLE_KEY)');
@@ -309,7 +311,10 @@ serve(async (req) => {
     }
 
     // Upload to storage first (for all file types)
-    const storagePath = `${user.id}/${Date.now()}_${fileName}`;
+    // Sanitize filename
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const storagePath = `${user.id}/${Date.now()}_${cleanFileName}`;
+
     const { error: uploadError } = await supabase.storage
       .from('bills')
       .upload(storagePath, arrayBuffer, {
@@ -391,49 +396,81 @@ FORMATO OUTPUT (JSON STRICT):
     ];
 
     console.log('Sending request to AI...');
-    console.log('Model: google/gemini-2.5-flash');
+    console.log('Model: google/gemini-1.5-flash-001');
 
     // Analyze with AI
     // Analyze with AI
     let aiData;
 
     // Use Google Gemini Direct API
-    console.log('Using Google Gemini Direct API with gemini-2.5-flash');
+    console.log(`Using Google Gemini Direct API (v1beta) with ${GEMINI_MODEL}`);
 
     // Note: We already checked for GEMINI_API_KEY at the start
 
-    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: systemPrompt + "\n\n" + 'Analizza questa bolletta energetica italiana. IMPORTANTE: Estrai il CONSUMO DEL PERIODO fatturato (non annuo) e le DATE ESATTE del periodo di riferimento. Cerca attentamente "Periodo di riferimento", "Dal... al...", "Consumi fatturati".' },
-            {
-              inline_data: {
-                mime_type: fileType,
-                data: base64
-              }
-            }
-          ]
-        }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 8192,
-          responseMimeType: "application/json"
-        }
-      }),
-    });
+    const CANDIDATE_MODELS = [
+      GEMINI_MODEL,              // User configured model (priority)
+      'gemini-2.5-flash-lite',   // Stable Lite
+      'gemini-flash-latest',     // Latest alias
+      'gemini-2.0-flash-lite-preview-02-05' // Fallback preview
+    ].filter(Boolean);
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('Gemini API error:', aiResponse.status, errorText);
-      throw new Error(`Gemini API error: ${aiResponse.status} ${errorText}`);
+    // Remove duplicates
+    const MODELS_TO_TRY = [...new Set(CANDIDATE_MODELS)];
+
+    let aiResponse;
+    let googleData;
+    let lastError;
+
+    console.log(`Starting analysis. Candidates: ${MODELS_TO_TRY.join(', ')}`);
+
+    for (const model of MODELS_TO_TRY) {
+      try {
+        console.log(`Attempting analysis with model: ${model}`);
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: systemPrompt + "\n\n" + 'Analizza questa bolletta energetica italiana. IMPORTANTE: Estrai il CONSUMO DEL PERIODO fatturato (non annuo) e le DATE ESATTE del periodo di riferimento. Cerca attentamente "Periodo di riferimento", "Dal... al...", "Consumi fatturati".' },
+                {
+                  inline_data: {
+                    mime_type: fileType,
+                    data: base64
+                  }
+                }
+              ]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 8192
+            }
+          }),
+        });
+
+        if (resp.ok) {
+          aiResponse = resp;
+          console.log(`Success with model: ${model}`);
+          break; // Exit loop on success
+        } else {
+          const errText = await resp.text();
+          console.warn(`Model ${model} failed with ${resp.status}: ${errText}`);
+          lastError = `Model ${model} failed: ${resp.status} ${errText}`;
+          // Continue to next model
+        }
+      } catch (e) {
+        console.warn(`Network error with model ${model}:`, e);
+        lastError = `Network error: ${e}`;
+      }
     }
 
-    const googleData = await aiResponse.json();
+    if (!aiResponse || !aiResponse.ok) {
+      throw new Error(`All models failed. Last error: ${lastError}`);
+    }
+
+    googleData = await aiResponse.json();
     console.log('=== GEMINI RAW RESPONSE ===');
     console.log(JSON.stringify(googleData, null, 2));
 
@@ -479,6 +516,7 @@ FORMATO OUTPUT (JSON STRICT):
       power_kw: number | null;
       customer_code: string | null;
       price_kwh: number | null;
+      bill_type: 'ELECTRICITY'; // Explicitly identify bill type
     }
 
     let extractedData: ExtractedBillData = {
@@ -496,7 +534,8 @@ FORMATO OUTPUT (JSON STRICT):
       tariff_type: null,
       power_kw: null,
       customer_code: null,
-      price_kwh: null
+      price_kwh: null,
+      bill_type: 'ELECTRICITY'
     };
 
     let debugReasoning: string | null = null;
@@ -663,7 +702,7 @@ FORMATO OUTPUT (JSON STRICT):
       .from('bill_uploads')
       .insert({
         user_id: user.id,
-        file_path: fileName,
+        file_path: storagePath, // Fixed: Use full storage path
         ocr_data: extractedData
       });
 
@@ -708,7 +747,7 @@ FORMATO OUTPUT (JSON STRICT):
         success: true,
         data: extractedData,
         debug_reasoning: debugReasoning, // Return reasoning to frontend
-        file_path: fileName,
+        file_path: storagePath, // Fixed: Return full storage path
         isPdf
       }),
       {

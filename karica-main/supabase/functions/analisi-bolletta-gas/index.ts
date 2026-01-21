@@ -259,6 +259,8 @@ serve(async (req) => {
         const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
         const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
         const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        const rawModel = Deno.env.get('GEMINI_MODEL');
+        const GEMINI_MODEL = (rawModel ? rawModel.trim() : 'gemini-1.5-flash');
 
         if (!GEMINI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
             throw new Error('Missing environment variables');
@@ -342,25 +344,64 @@ FORMATO OUTPUT (JSON STRICT):
   "climate_zone_inferred": "NORD" | "CENTRO" | "SUD"
 }`;
 
-        const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [
-                        { text: systemPrompt },
-                        { inline_data: { mime_type: fileType, data: base64 } } // PDF or Image
-                    ]
-                }],
-                generationConfig: {
-                    temperature: 0.1,
-                    maxOutputTokens: 8192,
-                    responseMimeType: "application/json"
-                }
-            })
-        });
+        // Use Google Gemini Direct API
+        console.log(`Using Google Gemini Direct API (v1beta) with ${GEMINI_MODEL}`);
 
-        if (!aiResponse.ok) throw new Error(`Gemini API Error: ${aiResponse.status}`);
+        // Note: We already checked for GEMINI_API_KEY at the start
+
+        const CANDIDATE_MODELS = [
+            GEMINI_MODEL,              // User configured model (priority)
+            'gemini-2.5-flash-lite',   // Stable Lite
+            'gemini-flash-latest',     // Latest alias
+            'gemini-2.0-flash-lite-preview-02-05' // Fallback preview
+        ].filter(Boolean);
+
+        // Remove duplicates
+        const MODELS_TO_TRY = [...new Set(CANDIDATE_MODELS)];
+
+        let aiResponse;
+        let lastError;
+
+        console.log(`Starting analysis. Candidates: ${MODELS_TO_TRY.join(', ')}`);
+
+        for (const model of MODELS_TO_TRY) {
+            try {
+                console.log(`Attempting analysis with model: ${model}`);
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: systemPrompt },
+                                { inline_data: { mime_type: fileType, data: base64 } } // PDF or Image
+                            ]
+                        }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            maxOutputTokens: 8192
+                        }
+                    })
+                });
+
+                if (resp.ok) {
+                    aiResponse = resp;
+                    console.log(`Success with model: ${model}`);
+                    break; // Exit loop on success
+                } else {
+                    const errText = await resp.text();
+                    console.warn(`Model ${model} failed with ${resp.status}: ${errText}`);
+                    lastError = `Model ${model} failed: ${resp.status} ${errText}`;
+                }
+            } catch (e) {
+                console.warn(`Network error with model ${model}:`, e);
+                lastError = `Network error: ${e}`;
+            }
+        }
+
+        if (!aiResponse || !aiResponse.ok) {
+            throw new Error(`All models failed. Last error: ${lastError}`);
+        }
         const googleData = await aiResponse.json();
         const rawText = googleData.candidates[0].content.parts[0].text;
 
@@ -404,16 +445,21 @@ FORMATO OUTPUT (JSON STRICT):
             extractedData.projection_details = calcResult.details;
         }
 
+        // Sanitize filename to prevent storage path issues
+        const cleanFileName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const storagePath = `${user.id}/${Date.now()}_GAS_${cleanFileName}`;
+
         // Save to DB (omitted complex Profile update logic for brevity, insert into bill_uploads is main goal)
         await supabase.from('bill_uploads').insert({
             user_id: user.id,
-            file_path: fileName,
+            file_path: storagePath, // Fixed: Use full storage path
             ocr_data: { ...extractedData, bill_type: 'GAS' }
         });
 
         return new Response(JSON.stringify({
             success: true,
             data: extractedData,
+            file_path: storagePath, // Fixed: Return file_path to client
             debug_reasoning: parsed._reasoning
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
