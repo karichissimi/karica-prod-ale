@@ -9,16 +9,16 @@ interface ConsumptionChartProps {
   energyClass: string | null;
 }
 
-export const ConsumptionChart = ({ 
-  currentConsumption, 
+export const ConsumptionChart = ({
+  currentConsumption,
   yearlySavings,
-  energyClass 
+  energyClass
 }: ConsumptionChartProps) => {
   // Estimate consumption after interventions (assume savings correlate to ~15-25% reduction)
   const savingsPercentage = Math.min(0.30, yearlySavings / (currentConsumption * 0.25));
   const afterConsumption = Math.round(currentConsumption * (1 - savingsPercentage));
   const monthlySavings = Math.round(yearlySavings / 12);
-  
+
   const data = [
     {
       name: 'Attuale',
@@ -49,39 +49,39 @@ export const ConsumptionChart = ({
           </div>
         )}
       </div>
-      
+
       <div className="h-40 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart 
-            data={data} 
+          <BarChart
+            data={data}
             layout="vertical"
             margin={{ top: 10, right: 60, left: 10, bottom: 10 }}
           >
-            <XAxis 
-              type="number" 
-              hide 
-              domain={[0, currentConsumption * 1.1]} 
+            <XAxis
+              type="number"
+              hide
+              domain={[0, currentConsumption * 1.1]}
             />
-            <YAxis 
-              type="category" 
-              dataKey="name" 
+            <YAxis
+              type="category"
+              dataKey="name"
               axisLine={false}
               tickLine={false}
               tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
               width={90}
             />
-            <Bar 
-              dataKey="consumption" 
+            <Bar
+              dataKey="consumption"
               radius={[0, 8, 8, 0]}
               barSize={32}
             >
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} />
               ))}
-              <LabelList 
-                dataKey="consumption" 
-                position="right" 
-                formatter={(value: number) => `${value.toLocaleString()} kWh`}
+              <LabelList
+                dataKey="consumption"
+                position="right"
+                formatter={(value: any) => `${value.toLocaleString()} kWh`}
                 style={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
               />
             </Bar>

@@ -41,8 +41,8 @@ export function Layout({ children }: LayoutProps) {
         (payload) => {
           if (payload.new) {
             setProfile({
-              avatar_url: payload.new.avatar_url as string,
-              full_name: payload.new.full_name as string
+              avatar_url: (payload.new.avatar_url as string) || '',
+              full_name: (payload.new.full_name as string) || ''
             });
           }
         }
@@ -64,7 +64,10 @@ export function Layout({ children }: LayoutProps) {
       .single();
 
     if (data) {
-      setProfile(data);
+      setProfile({
+        avatar_url: data.avatar_url || '',
+        full_name: data.full_name || ''
+      });
     }
   };
 

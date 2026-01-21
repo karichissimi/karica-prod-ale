@@ -72,7 +72,7 @@ export const AreraExplanationPopup = ({
 }: AreraExplanationPopupProps) => {
   const currentMonth = new Date().getMonth() + 1;
   const coveredMonthsCount = monthsCovered.length;
-  
+
   // Generate chart data with consumption values
   const chartData: MonthDetailData[] = Object.entries(ARERA_PROFILE).map(([month, weight]) => {
     const monthNum = parseInt(month);
@@ -93,7 +93,7 @@ export const AreraExplanationPopup = ({
   const avgMonthly = annualConsumption ? Math.round(annualConsumption / 12) : 0;
   const avgMonthlyEur = Math.round(avgMonthly * priceKwh * 100) / 100;
   const annualCostEur = annualConsumption ? Math.round(annualConsumption * priceKwh) : 0;
-  
+
   // Comparison with Italian average
   const italianAvg = ITALIAN_AVERAGE_BY_SIZE.average;
   const italianAvgCost = Math.round(italianAvg * priceKwh);
@@ -139,7 +139,7 @@ export const AreraExplanationPopup = ({
         </SheetHeader>
 
         <div className="space-y-6 pb-6">
-          
+
           {/* What is ARERA */}
           <Card className="p-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200">
             <div className="flex items-start gap-3">
@@ -149,8 +149,8 @@ export const AreraExplanationPopup = ({
               <div>
                 <h4 className="font-semibold text-blue-800 dark:text-blue-200">Cos'è il profilo ARERA?</h4>
                 <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                  L'<strong>ARERA</strong> (Autorità per l'Energia) definisce quanto si consuma tipicamente ogni mese dell'anno. 
-                  Ad esempio, a <strong>Dicembre</strong> si consuma il <strong>10%</strong> del totale annuo (luci accese più a lungo), 
+                  L'<strong>ARERA</strong> (Autorità per l'Energia) definisce quanto si consuma tipicamente ogni mese dell'anno.
+                  Ad esempio, a <strong>Dicembre</strong> si consuma il <strong>10%</strong> del totale annuo (luci accese più a lungo),
                   mentre a <strong>Maggio</strong> solo il <strong>7%</strong>.
                 </p>
               </div>
@@ -163,33 +163,33 @@ export const AreraExplanationPopup = ({
             <p className="text-sm text-muted-foreground mb-4">
               Spesa mensile media: ~{avgMonthlyEur.toFixed(0)}€ ({avgMonthly.toLocaleString()} kWh) • {coveredMonthsCount}/12 mesi reali
             </p>
-            
+
             <div className="h-52 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={chartData} 
+                <BarChart
+                  data={chartData}
                   margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
-                  onClick={(data) => {
+                  onClick={(data: any) => {
                     if (data && data.activePayload) {
                       const clickedMonth = data.activePayload[0].payload.monthNum;
                       onMonthSelect?.(selectedMonth === clickedMonth ? null : clickedMonth);
                     }
                   }}
                 >
-                  <XAxis 
-                    dataKey="month" 
-                    tick={{ fontSize: 10 }} 
-                    axisLine={false} 
-                    tickLine={false} 
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
                   />
                   <YAxis hide />
-                  <ReferenceLine 
-                    y={avgMonthly} 
-                    stroke="hsl(var(--muted-foreground))" 
+                  <ReferenceLine
+                    y={avgMonthly}
+                    stroke="hsl(var(--muted-foreground))"
                     strokeDasharray="3 3"
                     label={{ value: 'Media', position: 'right', fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                   />
-                  <Tooltip 
+                  <Tooltip
                     cursor={{ fill: 'hsl(var(--muted) / 0.3)' }}
                     content={({ active, payload }) => {
                       if (!active || !payload?.[0]) return null;
@@ -198,8 +198,8 @@ export const AreraExplanationPopup = ({
                         <div className="bg-card border rounded-lg p-3 shadow-lg">
                           <div className="flex items-center gap-2 mb-1">
                             <p className="font-semibold">{MONTH_NAMES[data.monthNum - 1]}</p>
-                            <Badge 
-                              variant="outline" 
+                            <Badge
+                              variant="outline"
                               className={`text-[10px] px-1.5 py-0 ${data.isCovered ? 'bg-green-500/10 text-green-600 border-green-500/30' : 'bg-muted text-muted-foreground'}`}
                             >
                               {data.isCovered ? '✓ Reale' : '~ Stimato'}
@@ -212,21 +212,21 @@ export const AreraExplanationPopup = ({
                       );
                     }}
                   />
-                  <Bar 
-                    dataKey="consumption" 
+                  <Bar
+                    dataKey="consumption"
                     radius={[4, 4, 0, 0]}
                     cursor="pointer"
                   >
                     {chartData.map((entry, index) => (
-                      <Cell 
+                      <Cell
                         key={`cell-${index}`}
                         fill={
                           selectedMonth === entry.monthNum
                             ? 'hsl(var(--primary))'
-                            : entry.isCurrent 
-                              ? 'hsl(var(--primary) / 0.8)' 
-                              : entry.isCovered 
-                                ? 'hsl(var(--primary) / 0.5)' 
+                            : entry.isCurrent
+                              ? 'hsl(var(--primary) / 0.8)'
+                              : entry.isCovered
+                                ? 'hsl(var(--primary) / 0.5)'
                                 : 'hsl(var(--muted-foreground) / 0.3)'
                         }
                         stroke={selectedMonth === entry.monthNum ? 'hsl(var(--primary))' : 'none'}
@@ -247,8 +247,8 @@ export const AreraExplanationPopup = ({
                       <p className="text-sm text-muted-foreground">
                         {selectedMonthData.isCovered ? 'Consumo reale' : 'Consumo stimato'}
                       </p>
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className={`text-[10px] px-1.5 py-0 ${selectedMonthData.isCovered ? 'bg-green-500/10 text-green-600 border-green-500/30' : 'bg-muted text-muted-foreground'}`}
                       >
                         {selectedMonthData.isCovered ? '✓ Reale' : '~ Stimato'}
@@ -291,7 +291,7 @@ export const AreraExplanationPopup = ({
               <Home className="h-5 w-5 text-muted-foreground" />
               <h4 className="font-semibold">Confronto con la media italiana</h4>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="p-3 rounded-lg bg-muted/50">
                 <p className="text-xs text-muted-foreground">Tu spendi</p>
@@ -341,8 +341,8 @@ export const AreraExplanationPopup = ({
                 const isClosest = annualConsumption && Math.abs(annualConsumption - item.value) < 300;
                 const itemCost = Math.round(item.value * priceKwh);
                 return (
-                  <div 
-                    key={item.label} 
+                  <div
+                    key={item.label}
                     className={`flex items-center justify-between p-2 rounded-lg ${isClosest ? 'bg-primary/10 border border-primary/20' : ''}`}
                   >
                     <span className="text-sm">{item.label}</span>

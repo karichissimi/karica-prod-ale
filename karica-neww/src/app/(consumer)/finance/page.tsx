@@ -90,7 +90,16 @@ export default function Finance() {
                 .order('interest_rate_min');
 
             if (partnersError) throw partnersError;
-            setLoanPartners(partnersData || []);
+            // Map data to ensure no nulls in required number fields
+            const safePartners = (partnersData || []).map(p => ({
+                ...p,
+                interest_rate_min: p.interest_rate_min ?? 0,
+                interest_rate_max: p.interest_rate_max ?? 0,
+                max_duration_months: p.max_duration_months ?? 0,
+                min_amount: p.min_amount ?? 0,
+                max_amount: p.max_amount ?? 0
+            }));
+            setLoanPartners(safePartners as LoanPartner[]);
 
             // Load my loan requests
             const { data: requestsData, error: requestsError } = await supabase
@@ -103,7 +112,20 @@ export default function Finance() {
                 .order('created_at', { ascending: false });
 
             if (requestsError) throw requestsError;
-            setMyRequests(requestsData || []);
+
+            const safeRequests = (requestsData || []).map(r => ({
+                ...r,
+                loan_partner: r.loan_partner ? {
+                    ...r.loan_partner,
+                    interest_rate_min: r.loan_partner.interest_rate_min ?? 0,
+                    interest_rate_max: r.loan_partner.interest_rate_max ?? 0,
+                    max_duration_months: r.loan_partner.max_duration_months ?? 0,
+                    min_amount: r.loan_partner.min_amount ?? 0,
+                    max_amount: r.loan_partner.max_amount ?? 0
+                } : undefined
+            }));
+
+            setMyRequests(safeRequests as LoanRequest[]);
         } catch (error) {
             console.error('Error loading finance data:', error);
             toast({

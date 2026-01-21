@@ -17,9 +17,9 @@ export function ParallaxBackground() {
     <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
       {/* Gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5" />
-      
+
       {/* Floating orbs with parallax */}
-      <div 
+      <div
         className="absolute w-96 h-96 rounded-full bg-primary/10 blur-3xl"
         style={{
           top: '10%',
@@ -27,7 +27,7 @@ export function ParallaxBackground() {
           transform: `translateY(${scrollY * 0.3}px)`,
         }}
       />
-      <div 
+      <div
         className="absolute w-72 h-72 rounded-full bg-secondary/10 blur-3xl"
         style={{
           bottom: '20%',
@@ -35,7 +35,7 @@ export function ParallaxBackground() {
           transform: `translateY(${scrollY * -0.2}px)`,
         }}
       />
-      <div 
+      <div
         className="absolute w-64 h-64 rounded-full bg-accent/10 blur-2xl"
         style={{
           top: '50%',
@@ -46,7 +46,7 @@ export function ParallaxBackground() {
 
       {/* Floating logo watermarks with parallax */}
       <img
-        src={karicaLogo}
+        src={karicaLogo.src}
         alt=""
         aria-hidden="true"
         className="absolute opacity-[0.03] w-40 h-40"
@@ -57,7 +57,7 @@ export function ParallaxBackground() {
         }}
       />
       <img
-        src={karicaLogo}
+        src={karicaLogo.src}
         alt=""
         aria-hidden="true"
         className="absolute opacity-[0.02] w-32 h-32"
@@ -68,7 +68,7 @@ export function ParallaxBackground() {
         }}
       />
       <img
-        src={karicaLogo}
+        src={karicaLogo.src}
         alt=""
         aria-hidden="true"
         className="absolute opacity-[0.02] w-24 h-24"
@@ -80,7 +80,7 @@ export function ParallaxBackground() {
       />
 
       {/* Grid pattern with parallax */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.015]"
         style={{
           backgroundImage: `

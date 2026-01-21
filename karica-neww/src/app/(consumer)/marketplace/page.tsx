@@ -87,7 +87,16 @@ export default function Marketplace() {
                 .order('sort_order');
 
             if (categoriesError) throw categoriesError;
-            setCategories(categoriesData || []);
+            if (categoriesError) throw categoriesError;
+
+            // Map data to ensure no nulls in required string fields
+            const safeCategories = (categoriesData || []).map(c => ({
+                ...c,
+                description: c.description || '',
+                slug: c.slug || '',
+                icon: c.icon || ''
+            }));
+            setCategories(safeCategories);
 
             // Load products
             const { data: productsData, error: productsError } = await supabase
@@ -100,7 +109,18 @@ export default function Marketplace() {
                 .order('is_featured', { ascending: false });
 
             if (productsError) throw productsError;
-            setProducts(productsData || []);
+            if (productsError) throw productsError;
+
+            const safeProducts = (productsData || []).map(p => ({
+                ...p,
+                category: p.category ? {
+                    ...p.category,
+                    description: p.category.description || '',
+                    slug: p.category.slug || '',
+                    icon: p.category.icon || ''
+                } : undefined
+            }));
+            setProducts(safeProducts as Product[]);
         } catch (error) {
             console.error('Error loading marketplace data:', error);
             toast({
@@ -352,7 +372,7 @@ export default function Marketplace() {
 
                             <p className="text-muted-foreground">{selectedProduct.description}</p>
 
-                            {selectedProduct.features && Array.isArray(selectedProduct.features) && selectedProduct.features.length > 0 && (
+                            {Array.isArray(selectedProduct.features) && (selectedProduct.features as any[]).length > 0 && (
                                 <div>
                                     <h4 className="font-semibold mb-2">Caratteristiche</h4>
                                     <ul className="space-y-1">

@@ -33,15 +33,16 @@ export const PdfPreview = ({ filePath, file }: PdfPreviewProps) => {
         setLoading(false);
         return;
       }
-      
+
       // Otherwise, load from storage
+      console.log('DEBUG: Loading PDF from storage path:', filePath);
       try {
         const { data, error } = await supabase.storage
           .from('bills')
           .createSignedUrl(filePath, 3600); // 1 hour expiry
 
         if (error) {
-          console.error('Storage error:', error);
+          console.error('DEBUG: Storage createSignedUrl error:', error);
           setLoading(false);
           return;
         }

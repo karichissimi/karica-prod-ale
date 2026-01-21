@@ -62,7 +62,7 @@ export const ConsumptionCalculationPopup = ({
   projectedAddition,
   confidence
 }: ConsumptionCalculationPopupProps) => {
-  
+
   // Prepare chart data
   const chartData = Object.entries(ARERA_PROFILE).map(([month, weight]) => ({
     month: MONTH_LABELS[parseInt(month) - 1],
@@ -128,7 +128,7 @@ export const ConsumptionCalculationPopup = ({
         </SheetHeader>
 
         <div className="space-y-6 pb-6">
-          
+
           {/* CASE 1: Historical Complete */}
           {projectionMethod === 'historical_complete' && (
             <>
@@ -140,7 +140,7 @@ export const ConsumptionCalculationPopup = ({
                   <div className="flex-1">
                     <h4 className="font-semibold mb-1 text-green-800 dark:text-green-200">Dato reale dalla tua bolletta</h4>
                     <p className="text-sm text-green-700 dark:text-green-300">
-                      La tua bolletta riporta già il consumo degli ultimi 12 mesi. 
+                      La tua bolletta riporta già il consumo degli ultimi 12 mesi.
                       Non è necessaria nessuna proiezione!
                     </p>
                     <div className="mt-3 p-3 bg-white dark:bg-green-950 rounded-lg">
@@ -158,22 +158,22 @@ export const ConsumptionCalculationPopup = ({
               <Card className="p-4">
                 <h4 className="font-semibold mb-3">Distribuzione mensile stimata</h4>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Ecco come si distribuisce il consumo annuo di <strong>{annualProjection?.toLocaleString()} kWh</strong> sui 12 mesi, 
+                  Ecco come si distribuisce il consumo annuo di <strong>{annualProjection?.toLocaleString()} kWh</strong> sui 12 mesi,
                   basandoci sul profilo ARERA per clienti domestici.
                 </p>
                 <div className="h-48 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart 
+                    <BarChart
                       data={chartData.map(d => ({
                         ...d,
                         consumo: Math.round((annualProjection || 0) * ARERA_PROFILE[d.monthNum])
-                      }))} 
+                      }))}
                       margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
                     >
                       <XAxis dataKey="month" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis hide />
-                      <Tooltip 
-                        formatter={(value: number) => [`${value.toLocaleString()} kWh`, 'Consumo stimato']}
+                      <Tooltip
+                        formatter={(value: any) => [`${value?.toLocaleString() || 0} kWh`, 'Consumo stimato']}
                         labelFormatter={(label) => {
                           const item = chartData.find(d => d.month === label);
                           return MONTH_NAMES[item ? item.monthNum - 1 : 0];
@@ -181,7 +181,7 @@ export const ConsumptionCalculationPopup = ({
                       />
                       <Bar dataKey="consumo" radius={[4, 4, 0, 0]}>
                         {chartData.map((entry, index) => (
-                          <Cell 
+                          <Cell
                             key={`cell-${index}`}
                             fill={entry.isCovered ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.4)'}
                           />
@@ -269,8 +269,8 @@ export const ConsumptionCalculationPopup = ({
                     <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                       <XAxis dataKey="month" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis hide domain={[0, 12]} />
-                      <Tooltip 
-                        formatter={(value: number) => [`${value.toFixed(1)}%`, 'Peso ARERA']}
+                      <Tooltip
+                        formatter={(value: any) => [`${Number(value || 0).toFixed(1)}%`, 'Peso ARERA']}
                         labelFormatter={(label) => {
                           const item = chartData.find(d => d.month === label);
                           return MONTH_NAMES[item ? item.monthNum - 1 : 0];
@@ -278,7 +278,7 @@ export const ConsumptionCalculationPopup = ({
                       />
                       <Bar dataKey="weight" radius={[4, 4, 0, 0]}>
                         {chartData.map((entry, index) => (
-                          <Cell 
+                          <Cell
                             key={`cell-${index}`}
                             fill={entry.isCovered ? 'hsl(var(--primary))' : entry.isProjected ? 'hsl(45 93% 47%)' : 'hsl(var(--muted-foreground) / 0.3)'}
                           />
@@ -349,7 +349,7 @@ export const ConsumptionCalculationPopup = ({
                   <div className="flex-1">
                     <h4 className="font-semibold mb-2">Perché non moltiplichiamo ×12?</h4>
                     <p className="text-sm text-muted-foreground">
-                      I consumi elettrici non sono uguali ogni mese: d'inverno si consuma di più 
+                      I consumi elettrici non sono uguali ogni mese: d'inverno si consuma di più
                       (luci accese più a lungo), d'estate meno (ma con picchi per l'aria condizionata).
                     </p>
                     <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
@@ -380,14 +380,14 @@ export const ConsumptionCalculationPopup = ({
                     )}
                   </div>
                 </div>
-                
+
                 <div className="h-48 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                       <XAxis dataKey="month" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis hide domain={[0, 12]} />
-                      <Tooltip 
-                        formatter={(value: number) => [`${value.toFixed(1)}%`, 'Peso ARERA']}
+                      <Tooltip
+                        formatter={(value: any) => [`${Number(value || 0).toFixed(1)}%`, 'Peso ARERA']}
                         labelFormatter={(label) => {
                           const item = chartData.find(d => d.month === label);
                           return MONTH_NAMES[item ? item.monthNum - 1 : 0];
@@ -395,7 +395,7 @@ export const ConsumptionCalculationPopup = ({
                       />
                       <Bar dataKey="weight" radius={[4, 4, 0, 0]}>
                         {chartData.map((entry, index) => (
-                          <Cell 
+                          <Cell
                             key={`cell-${index}`}
                             fill={entry.isCovered ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground) / 0.3)'}
                           />
@@ -436,7 +436,7 @@ export const ConsumptionCalculationPopup = ({
                           <p className="font-mono font-semibold">{normalizationFactor.toFixed(2)}</p>
                         </div>
                       </div>
-                      
+
                       <div className="p-3 bg-background rounded-lg border">
                         <p className="text-xs text-muted-foreground mb-2">Formula:</p>
                         <p className="font-mono text-sm text-center">
@@ -471,8 +471,8 @@ export const ConsumptionCalculationPopup = ({
                     <strong>Perché è diverso da ×12?</strong>
                   </p>
                   <p className="mt-1">
-                    Una moltiplicazione semplice ({periodConsumption} × 12 = {(periodConsumption * 12).toLocaleString()} kWh) 
-                    non tiene conto della stagionalità. {getCoveredMonthsText()} {monthsCovered.length === 1 ? 'pesa' : 'pesano'} il {(totalWeight * 100).toFixed(1)}% 
+                    Una moltiplicazione semplice ({periodConsumption} × 12 = {(periodConsumption * 12).toLocaleString()} kWh)
+                    non tiene conto della stagionalità. {getCoveredMonthsText()} {monthsCovered.length === 1 ? 'pesa' : 'pesano'} il {(totalWeight * 100).toFixed(1)}%
                     del consumo annuo.
                   </p>
                 </div>
@@ -491,7 +491,7 @@ export const ConsumptionCalculationPopup = ({
                   <div className="flex-1">
                     <h4 className="font-semibold mb-1">Stima semplificata</h4>
                     <p className="text-sm text-muted-foreground">
-                      Non avendo le date precise del periodo di fatturazione, abbiamo usato 
+                      Non avendo le date precise del periodo di fatturazione, abbiamo usato
                       una stima semplice moltiplicando il consumo estratto per 12 mesi.
                     </p>
                   </div>
@@ -528,7 +528,7 @@ export const ConsumptionCalculationPopup = ({
                   <strong>Nota:</strong>
                 </p>
                 <p className="mt-1">
-                  Questa stima potrebbe essere imprecisa. Per un calcolo più accurato, 
+                  Questa stima potrebbe essere imprecisa. Per un calcolo più accurato,
                   modifica i dati e inserisci le date del periodo di fatturazione.
                 </p>
               </div>

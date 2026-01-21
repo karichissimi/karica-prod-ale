@@ -75,10 +75,16 @@ const Messages = () => {
 
                 return {
                     ...lead,
-                    intervention_type: lead.intervention_types,
-                    partner: lead.partners,
-                    lastMessage: messages?.[0]?.message || null,
-                    unreadCount: 0 // Could implement unread tracking later
+                    status: lead.status || 'new',
+                    created_at: lead.created_at || new Date().toISOString(),
+                    updated_at: lead.updated_at || new Date().toISOString(),
+                    intervention_type: lead.intervention_types ? {
+                        name: lead.intervention_types.name,
+                        icon: lead.intervention_types.icon || ''
+                    } : undefined,
+                    partner: lead.partners || undefined,
+                    lastMessage: messages?.[0]?.message || undefined,
+                    unreadCount: 0
                 };
             })
         );

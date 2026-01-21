@@ -15,16 +15,16 @@ interface PullToRefreshState {
 }
 
 export function usePullToRefresh(options: UsePullToRefreshOptions): PullToRefreshState & {
-  containerRef: React.RefObject<HTMLDivElement>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
   handleTouchStart: (e: React.TouchEvent) => void;
   handleTouchMove: (e: React.TouchEvent) => void;
   handleTouchEnd: () => void;
 } {
-  const { 
-    onRefresh, 
-    threshold = 80, 
+  const {
+    onRefresh,
+    threshold = 80,
     resistance = 2.5,
-    maxPull = 150 
+    maxPull = 150
   } = options;
 
   const [state, setState] = useState<PullToRefreshState>({
@@ -40,11 +40,11 @@ export function usePullToRefresh(options: UsePullToRefreshOptions): PullToRefres
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (state.isRefreshing) return;
-    
+
     // Check if the scroll container is at the top
     const scrollContainer = document.querySelector('[data-scroll-container]');
     const scrollTop = scrollContainer?.scrollTop ?? 0;
-    
+
     if (scrollTop <= 0) {
       startY.current = e.touches[0].clientY;
       isAtTop.current = true;
@@ -55,11 +55,11 @@ export function usePullToRefresh(options: UsePullToRefreshOptions): PullToRefres
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (state.isRefreshing || !isAtTop.current) return;
-    
+
     // Double-check scroll position
     const scrollContainer = document.querySelector('[data-scroll-container]');
     const scrollTop = scrollContainer?.scrollTop ?? 0;
-    
+
     if (scrollTop > 0) {
       if (state.isPulling) {
         setState(prev => ({ ...prev, isPulling: false, pullDistance: 0, pullProgress: 0 }));
@@ -70,12 +70,12 @@ export function usePullToRefresh(options: UsePullToRefreshOptions): PullToRefres
 
     const currentY = e.touches[0].clientY;
     const diff = currentY - startY.current;
-    
+
     if (diff > 10) {
       // Apply resistance to make pull feel natural
       const distance = Math.min(diff / resistance, maxPull);
       const progress = Math.min(distance / threshold, 1);
-      
+
       setState(prev => ({
         ...prev,
         isPulling: true,
@@ -97,32 +97,32 @@ export function usePullToRefresh(options: UsePullToRefreshOptions): PullToRefres
     if (!state.isPulling) return;
 
     if (state.pullDistance >= threshold && !state.isRefreshing) {
-      setState(prev => ({ 
-        ...prev, 
-        isRefreshing: true, 
+      setState(prev => ({
+        ...prev,
+        isRefreshing: true,
         pullDistance: threshold * 0.6,
-        pullProgress: 0.6 
+        pullProgress: 0.6
       }));
-      
+
       try {
         await onRefresh();
       } finally {
-        setState({ 
-          isRefreshing: false, 
+        setState({
+          isRefreshing: false,
           isPulling: false,
           pullDistance: 0,
-          pullProgress: 0 
+          pullProgress: 0
         });
       }
     } else {
-      setState({ 
+      setState({
         isPulling: false,
         isRefreshing: false,
         pullDistance: 0,
-        pullProgress: 0 
+        pullProgress: 0
       });
     }
-    
+
     startY.current = 0;
     isAtTop.current = false;
   }, [state.isPulling, state.pullDistance, state.isRefreshing, threshold, onRefresh]);

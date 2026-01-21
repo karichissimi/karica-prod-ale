@@ -10,30 +10,30 @@ interface PullToRefreshProps {
 }
 
 export function PullToRefresh({ children, onRefresh, className }: PullToRefreshProps) {
-  const { 
-    isPulling, 
-    isRefreshing, 
-    pullDistance, 
-    pullProgress, 
+  const {
+    isPulling,
+    isRefreshing,
+    pullDistance,
+    pullProgress,
     containerRef,
     handleTouchStart,
     handleTouchMove,
-    handleTouchEnd 
+    handleTouchEnd
   } = usePullToRefresh({
     onRefresh,
     threshold: 80,
   });
 
   return (
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className={cn("relative touch-pan-y", className)}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       {/* Pull indicator */}
-      <div 
+      <div
         className={cn(
           "absolute left-0 right-0 flex items-center justify-center overflow-hidden transition-all duration-200 z-50 pointer-events-none",
           isPulling || isRefreshing ? "opacity-100" : "opacity-0"
@@ -43,7 +43,7 @@ export function PullToRefresh({ children, onRefresh, className }: PullToRefreshP
           top: 0,
         }}
       >
-        <div 
+        <div
           className={cn(
             "relative flex items-center justify-center",
             isRefreshing && "animate-bounce-soft"
@@ -54,7 +54,7 @@ export function PullToRefresh({ children, onRefresh, className }: PullToRefreshP
           }}
         >
           {/* Glow effect */}
-          <div 
+          <div
             className={cn(
               "absolute inset-0 rounded-full blur-md transition-opacity duration-300",
               isRefreshing ? "bg-primary/40 animate-pulse-soft" : "bg-primary/20"
@@ -64,17 +64,17 @@ export function PullToRefresh({ children, onRefresh, className }: PullToRefreshP
               opacity: pullProgress,
             }}
           />
-          
+
           {/* Logo */}
           <img
-            src={karicaLogo}
+            src={karicaLogo.src}
             alt=""
             className={cn(
               "relative h-10 w-10 object-contain transition-all duration-200",
               isRefreshing && "animate-spin-slow"
             )}
           />
-          
+
           {/* Progress ring */}
           {!isRefreshing && pullProgress > 0 && (
             <svg
@@ -104,14 +104,14 @@ export function PullToRefresh({ children, onRefresh, className }: PullToRefreshP
             </svg>
           )}
         </div>
-        
+
         {/* "Release to refresh" text */}
         {pullProgress >= 1 && !isRefreshing && (
           <span className="absolute bottom-2 text-xs text-primary font-medium animate-fade-in">
             Rilascia per aggiornare
           </span>
         )}
-        
+
         {/* "Refreshing" text */}
         {isRefreshing && (
           <span className="absolute bottom-2 text-xs text-primary font-medium animate-pulse">
@@ -119,9 +119,9 @@ export function PullToRefresh({ children, onRefresh, className }: PullToRefreshP
           </span>
         )}
       </div>
-      
+
       {/* Content with transform */}
-      <div 
+      <div
         className="transition-transform duration-200 ease-out"
         style={{
           transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : 'none',

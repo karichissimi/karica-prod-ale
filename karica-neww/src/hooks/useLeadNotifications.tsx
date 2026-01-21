@@ -69,7 +69,7 @@ export const useLeadNotifications = (userType: 'consumer' | 'partner') => {
     } else {
       await loadPartnerNotifications(userId);
     }
-    
+
     setLoading(false);
   };
 
@@ -99,7 +99,7 @@ export const useLeadNotifications = (userType: 'consumer' | 'partner') => {
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
       const unreadMessages = count || 0;
-      
+
       if (unreadMessages > 0) {
         totalUnread += unreadMessages;
         notifs.push({
@@ -115,11 +115,17 @@ export const useLeadNotifications = (userType: 'consumer' | 'partner') => {
   };
 
   const loadPartnerNotifications = async (userId: string) => {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user?.email) {
+      setUnreadCount(0);
+      return;
+    }
+
     // Get partner profile
     const { data: partner } = await supabase
       .from('partners')
       .select('id')
-      .eq('contact_email', (await supabase.auth.getUser()).data.user?.email)
+      .eq('contact_email', userData.user.email)
       .maybeSingle();
 
     if (!partner) {
@@ -151,7 +157,7 @@ export const useLeadNotifications = (userType: 'consumer' | 'partner') => {
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
       const unreadMessages = count || 0;
-      
+
       if (unreadMessages > 0) {
         totalUnread += unreadMessages;
         notifs.push({

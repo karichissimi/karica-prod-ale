@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Upload, Camera, FileText, Loader2, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CameraCapture } from '@/components/CameraCapture';
+import { useOnboarding } from '@/hooks/useOnboarding';
 
 interface BillUploadProps {
   onUpload: (file: File) => Promise<void>;
@@ -13,6 +14,7 @@ interface BillUploadProps {
 
 export const BillUpload = ({ onUpload, onSkip, loading }: BillUploadProps) => {
   const { toast } = useToast();
+  const { billType } = useOnboarding();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -84,7 +86,7 @@ export const BillUpload = ({ onUpload, onSkip, loading }: BillUploadProps) => {
         <div className="text-center space-y-2">
           <h2 className="text-2xl font-bold text-foreground">Carica la tua bolletta</h2>
           <p className="text-muted-foreground">
-            Carica una foto o il PDF della tua ultima bolletta energetica per iniziare
+            Carica una foto o il PDF della tua ultima bolletta {billType === 'GAS' ? 'del Gas' : 'della Luce'} per iniziare
           </p>
         </div>
 

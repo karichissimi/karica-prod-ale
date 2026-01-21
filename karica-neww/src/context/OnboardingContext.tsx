@@ -37,6 +37,13 @@ export interface BillAnalysisData {
     power_kw?: number | null;
     customer_code?: string | null;
     price_kwh?: number | null;
+    // Gas specific fields
+    pdr?: string | null;
+    period_consumption_smc?: number | null;
+    annual_consumption_reported_smc?: number | null;
+    municipality?: string | null;
+    climate_zone?: 'NORD' | 'CENTRO' | 'SUD' | null;
+    bill_type?: 'ELECTRICITY' | 'GAS';
 }
 
 // Legacy interface for backward compatibility
@@ -59,6 +66,8 @@ interface OnboardingContextType {
     analysisComplete: boolean;
     billData: BillData;
     billAnalysis: BillAnalysisData | null;
+    billType: 'ELECTRICITY' | 'GAS';
+    setBillType: (type: 'ELECTRICITY' | 'GAS') => void;
     billFilePath: string;
     uploadedFile: File | null;
     consents: ConsentsData;
@@ -69,6 +78,7 @@ interface OnboardingContextType {
     completeOnboarding: () => Promise<boolean>;
     handleSkipBillUpload: () => void;
     proceedFromGame: () => void;
+    confirmBillData: () => Promise<boolean>;
 }
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
@@ -92,6 +102,8 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
 
     // New full bill analysis data
     const [billAnalysis, setBillAnalysis] = useState<BillAnalysisData | null>(null);
+    const [billType, setBillType] = useState<'ELECTRICITY' | 'GAS'>('ELECTRICITY');
+
 
     // Legacy billData for backward compatibility
     const [billData, setBillData] = useState<BillData>({
@@ -139,9 +151,13 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
             console.log('DEBUG: Target Supabase URL:', supabaseUrl);
             console.log('DEBUG: User ID:', session.user.id);
             console.log('DEBUG: Token starts with:', session.access_token.substring(0, 10) + '...');
+            console.log('DEBUG: Analyzing bill type:', billType);
+
+            const endpoint = billType === 'GAS' ? 'analisi-bolletta-gas' : 'analisi-bolletta-luce';
+            console.log('Calling edge function:', endpoint);
 
             const response = await fetch(
-                `${supabaseUrl}/functions/v1/analyze-bill`,
+                `${supabaseUrl}/functions/v1/${endpoint}`,
                 {
                     method: 'POST',
                     headers: {
@@ -168,6 +184,16 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
             }
 
             const data = await response.json();
+
+            console.log('✅ Analysis Success!');
+            console.log('📦 Raw Data from Backend:', data);
+
+            // Temporary Debug Alert: Removed for production
+            if (data.debug_reasoning) {
+                console.log('🧠 AI Reasoning:', data.debug_reasoning);
+            } else {
+                console.log("⚠️ NESSUN RAGIONAMENTO RICEVUTO DAL SERVER");
+            }
             console.log('Analysis completed successfully');
 
             if (data?.data) {
@@ -178,14 +204,17 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
                 const annualConsumption = data.data.annual_consumption_projected ||
                     data.data.annual_consumption || 0;
                 setBillData({
-                    pod: data.data.pod || '',
+                    pod: data.data.pod || data.data.pdr || '',
                     supplier: data.data.supplier || '',
                     annualConsumption,
                 });
 
                 // Store file path for preview
+                console.log('DEBUG: File path from backend:', data.file_path);
                 if (data.file_path) {
                     setBillFilePath(data.file_path);
+                } else {
+                    console.warn('DEBUG: No file_path returned from backend!');
                 }
 
                 // Mark analysis as complete but DON'T change step
@@ -290,6 +319,52 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    // Helper for just updating bill data (without re-checking consents)
+    const confirmBillData = async () => {
+        setLoading(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Non autenticato');
+
+            // Update profile with verificated bill data
+            // CRITICAL: Only update ELECTRICITY data if billType is ELECTRICITY
+            // Gas data is stored in bill_uploads and doesn't map 1:1 to these profile columns (POD != PDR)
+            if (billType === 'ELECTRICITY') {
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .update({
+                        pod: billData.pod,
+                        energy_supplier: billData.supplier,
+                        annual_consumption_kwh: billData.annualConsumption,
+                    })
+                    .eq('id', user.id);
+
+                if (profileError) throw profileError;
+            } else {
+                // For GAS, we currently rely on bill_uploads. 
+                // Future-proof: If we add pdr/smc columns to profiles, we can update them here.
+                console.log('Skipping profile update for GAS bill to preserve Electric data.');
+            }
+
+            toast({
+                title: 'Dati aggiornati',
+                description: 'I dati della bolletta sono stati salvati correttamente.',
+            });
+
+            return true;
+        } catch (error) {
+            console.error('Error confirming bill data:', error);
+            toast({
+                title: 'Errore',
+                description: 'Impossibile salvare i dati della bolletta',
+                variant: 'destructive',
+            });
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const updateBillAnalysis = (data: Partial<BillAnalysisData>) => {
         setBillAnalysis(prev => prev ? { ...prev, ...data } : data as BillAnalysisData);
 
@@ -320,6 +395,8 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
             loading,
             analysisComplete,
             billData,
+            billType,
+            setBillType,
             billAnalysis,
             billFilePath,
             uploadedFile,
@@ -329,6 +406,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
             updateBillAnalysis,
             updateConsents,
             completeOnboarding,
+            confirmBillData,
             handleSkipBillUpload,
             proceedFromGame,
         }}>

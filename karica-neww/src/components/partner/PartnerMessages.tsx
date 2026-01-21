@@ -71,7 +71,10 @@ const PartnerMessages = ({ partnerId, leads }: PartnerMessagesProps) => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      setMessages((data || []).map(m => ({
+        ...m,
+        created_at: m.created_at || new Date().toISOString()
+      })));
     } catch (error) {
       console.error('Error loading messages:', error);
     } finally {
@@ -179,8 +182,8 @@ const PartnerMessages = ({ partnerId, leads }: PartnerMessagesProps) => {
             <>
               {/* Chat Header */}
               <div className="p-4 border-b flex items-center gap-3">
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   className="lg:hidden"
                   onClick={() => setSelectedConversation(null)}
@@ -227,13 +230,13 @@ const PartnerMessages = ({ partnerId, leads }: PartnerMessagesProps) => {
                           <p>{msg.message}</p>
                           <p className={cn(
                             "text-xs mt-1",
-                            msg.sender_type === 'partner' 
-                              ? "text-primary-foreground/70" 
+                            msg.sender_type === 'partner'
+                              ? "text-primary-foreground/70"
                               : "text-muted-foreground"
                           )}>
-                            {new Date(msg.created_at).toLocaleTimeString('it-IT', { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
+                            {new Date(msg.created_at).toLocaleTimeString('it-IT', {
+                              hour: '2-digit',
+                              minute: '2-digit'
                             })}
                           </p>
                         </div>
@@ -246,7 +249,7 @@ const PartnerMessages = ({ partnerId, leads }: PartnerMessagesProps) => {
 
               {/* Message Input */}
               <div className="p-4 border-t">
-                <form 
+                <form
                   onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
                   className="flex gap-2"
                 >

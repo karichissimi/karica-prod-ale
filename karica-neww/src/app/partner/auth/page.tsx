@@ -152,7 +152,10 @@ const PartnerAuth = () => {
             .order('name');
 
         if (data) {
-            setInterventionTypes(data);
+            setInterventionTypes(data.map(d => ({
+                ...d,
+                description: d.description || ''
+            })) as InterventionType[]);
         }
     };
 
@@ -229,7 +232,7 @@ const PartnerAuth = () => {
             if (error instanceof z.ZodError) {
                 toast({
                     title: 'Errore di validazione',
-                    description: error.errors[0].message,
+                    description: error.issues[0].message,
                     variant: 'destructive',
                 });
             }
@@ -267,7 +270,7 @@ const PartnerAuth = () => {
             if (error instanceof z.ZodError) {
                 toast({
                     title: 'Errore di validazione',
-                    description: error.errors[0].message,
+                    description: error.issues[0].message,
                     variant: 'destructive',
                 });
             }
@@ -360,7 +363,7 @@ const PartnerAuth = () => {
                     contact_phone: signupForm.phone || null,
                     description: signupForm.description || null,
                     intervention_types: selectedPartnerType === 'intervention' ? selectedInterventions : [],
-                    partner_type: selectedPartnerType,
+                    partner_type: selectedPartnerType as PartnerType,
                     status: 'pending',
                 });
 
@@ -399,7 +402,7 @@ const PartnerAuth = () => {
             if (error instanceof z.ZodError) {
                 toast({
                     title: 'Errore di validazione',
-                    description: error.errors[0].message,
+                    description: error.issues[0].message,
                     variant: 'destructive',
                 });
             }
@@ -549,8 +552,8 @@ const PartnerAuth = () => {
                             >
                                 <div
                                     className={`mt-0.5 h-4 w-4 shrink-0 rounded-sm border flex items-center justify-center ${isSelected
-                                            ? 'bg-primary border-primary text-primary-foreground'
-                                            : 'border-primary'
+                                        ? 'bg-primary border-primary text-primary-foreground'
+                                        : 'border-primary'
                                         }`}
                                 >
                                     {isSelected && <CheckCircle2 className="h-3 w-3" />}

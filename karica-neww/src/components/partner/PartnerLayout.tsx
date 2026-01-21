@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { 
-  LayoutDashboard, 
-  Users, 
-  MessageSquare, 
-  Bell, 
+import {
+  LayoutDashboard,
+  Users,
+  MessageSquare,
+  Bell,
   Settings
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,10 +23,10 @@ interface PartnerLayoutProps {
   partnerEmail?: string;
 }
 
-const PartnerLayout = ({ 
-  children, 
-  activeTab, 
-  onTabChange, 
+const PartnerLayout = ({
+  children,
+  activeTab,
+  onTabChange,
   unreadMessages,
   unreadNotifications,
   partnerName,
@@ -34,7 +34,7 @@ const PartnerLayout = ({
 }: PartnerLayoutProps) => {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const { unreadCount: realTimeUnread } = useLeadNotifications('partner');
-  
+
   // Use real-time unread count if available, otherwise fall back to prop
   const messagesUnread = realTimeUnread > 0 ? realTimeUnread : unreadMessages;
 
@@ -44,17 +44,17 @@ const PartnerLayout = ({
 
   const loadPartnerAvatar = async () => {
     if (!partnerEmail) return;
-    
+
     const { data: sessionData } = await supabase.auth.getSession();
     const currentUser = sessionData?.session?.user;
-    
+
     if (currentUser) {
       const { data } = await supabase
         .from('profiles')
         .select('avatar_url')
         .eq('id', currentUser.id)
         .maybeSingle();
-      
+
       if (data?.avatar_url) {
         setAvatarUrl(data.avatar_url);
       }
@@ -71,11 +71,11 @@ const PartnerLayout = ({
 
   const initials = partnerName
     ? partnerName
-        .split(' ')
-        .map(n => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
     : 'P';
 
   return (
@@ -84,16 +84,16 @@ const PartnerLayout = ({
       <header className="sticky top-0 z-50 h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex h-full items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-2">
-            <img src={karicaLogo} alt="Karica" className="h-8 w-8 object-contain logo-hover" />
+            <img src={karicaLogo.src} alt="Karica" className="h-8 w-8 object-contain logo-hover" />
             <h1 className="text-xl font-semibold bg-gradient-primary bg-clip-text text-transparent font-brand">
               Karica Partner
             </h1>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Avatar 
-              className="h-8 w-8 cursor-pointer hover:ring-2 ring-primary transition-all" 
+            <Avatar
+              className="h-8 w-8 cursor-pointer hover:ring-2 ring-primary transition-all"
               onClick={() => onTabChange('settings')}
             >
               {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile" />}

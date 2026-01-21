@@ -158,7 +158,11 @@ export default function AdminPanel() {
                 .order('created_at', { ascending: false });
 
             if (requestsError) throw requestsError;
-            setRequests(requestsData || []);
+            if (requestsError) throw requestsError;
+            setRequests((requestsData || []).map(r => ({
+                ...r,
+                intervention_types: r.intervention_types || []
+            })) as PartnerRequest[]);
 
             // Load intervention types
             const { data: typesData } = await supabase
@@ -185,10 +189,11 @@ export default function AdminPanel() {
 
                     return {
                         ...partner,
+                        is_active: partner.is_active || false,
                         specializations: specsData?.map(s => s.intervention_type_id) || []
                     };
                 })
-            );
+            ) as Partner[];
 
             setPartners(partnersWithSpecs);
         } catch (error) {

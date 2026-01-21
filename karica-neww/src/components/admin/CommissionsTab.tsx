@@ -5,20 +5,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
-import { 
-  Coins, 
-  Download, 
-  TrendingUp, 
-  ShoppingCart, 
-  Banknote, 
+import {
+  Coins,
+  Download,
+  TrendingUp,
+  ShoppingCart,
+  Banknote,
   Briefcase,
   Calendar,
   RefreshCw
@@ -104,7 +104,7 @@ export function CommissionsTab() {
       if (periodFilter !== 'all') {
         const now = new Date();
         let startDate: Date;
-        
+
         switch (periodFilter) {
           case 'today':
             startDate = new Date(now.setHours(0, 0, 0, 0));
@@ -121,14 +121,17 @@ export function CommissionsTab() {
           default:
             startDate = new Date(0);
         }
-        
+
         query = query.gte('created_at', startDate.toISOString());
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
-      setCommissions(data || []);
+      setCommissions((data || []).map(c => ({
+        ...c,
+        partner: c.partner || undefined
+      })) as Commission[]);
 
       // Calculate stats
       const allCommissions = data || [];

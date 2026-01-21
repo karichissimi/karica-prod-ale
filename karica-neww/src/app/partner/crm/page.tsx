@@ -82,7 +82,7 @@ const PartnerCRM = () => {
             const { data: partnerData } = await supabase
                 .from('partners')
                 .select('id, company_name')
-                .eq('contact_email', currentUser.email)
+                .eq('contact_email', currentUser.email || '')
                 .maybeSingle();
 
             if (partnerData) {
@@ -108,7 +108,7 @@ const PartnerCRM = () => {
             const { data: partnerData } = await supabase
                 .from('partners')
                 .select('id')
-                .eq('contact_email', currentUser.email)
+                .eq('contact_email', currentUser.email || '')
                 .maybeSingle();
 
             if (!partnerData) {
@@ -409,7 +409,7 @@ const PartnerCRM = () => {
 interface LeadsTableProps {
     leads: Lead[];
     onLeadClick: (lead: Lead) => void;
-    getStatusBadge: (status: string) => JSX.Element;
+    getStatusBadge: (status: string) => React.ReactNode;
 }
 
 function LeadsTable({ leads, onLeadClick, getStatusBadge }: LeadsTableProps) {

@@ -3,11 +3,11 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { 
-  ArrowLeft, 
-  Send, 
-  User, 
-  Building2, 
+import {
+  ArrowLeft,
+  Send,
+  User,
+  Building2,
   Clock,
   CheckCircle2,
   FileText,
@@ -107,9 +107,13 @@ const LeadDetail = ({ leadId, onBack }: LeadDetailProps) => {
 
     setLead({
       ...data,
-      intervention_type: data.intervention_types,
-      partner: data.partners
-    });
+      status: data.status || 'new',
+      intervention_type: data.intervention_types ? {
+        name: data.intervention_types.name,
+        icon: data.intervention_types.icon || 'Zap'
+      } : undefined,
+      partner: data.partners || undefined
+    } as Lead);
     setLoading(false);
   };
 
@@ -121,7 +125,10 @@ const LeadDetail = ({ leadId, onBack }: LeadDetailProps) => {
       .order('created_at', { ascending: true });
 
     if (!error && data) {
-      setMessages(data);
+      setMessages((data || []).map(m => ({
+        ...m,
+        created_at: m.created_at || new Date().toISOString()
+      })) as LeadMessage[]);
     }
   };
 
@@ -251,7 +258,7 @@ const LeadDetail = ({ leadId, onBack }: LeadDetailProps) => {
           <MessageSquare className="h-4 w-4" />
           Messaggi
         </h3>
-        
+
         <div className="space-y-3 max-h-[300px] overflow-y-auto mb-4">
           {messages.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-4">
@@ -264,11 +271,10 @@ const LeadDetail = ({ leadId, onBack }: LeadDetailProps) => {
                 className={`flex ${msg.sender_type === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] p-3 rounded-lg ${
-                    msg.sender_type === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
-                  }`}
+                  className={`max-w-[80%] p-3 rounded-lg ${msg.sender_type === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted'
+                    }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     {msg.sender_type === 'user' ? (

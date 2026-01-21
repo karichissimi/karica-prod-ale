@@ -54,7 +54,10 @@ export function InterventionResults({ onClose }: InterventionResultsProps) {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setLeads(data || []);
+      setLeads((data || []).map(l => ({
+        ...l,
+        intervention_type_id: l.intervention_type_id || ''
+      })) as Lead[]);
     } catch (error) {
       console.error("Error loading leads:", error);
     } finally {

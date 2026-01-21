@@ -12,6 +12,7 @@ import AnimatedLogo from '@/components/AnimatedLogo';
 import { WipDisclaimer } from "@/components/WipDisclaimer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BillUpload } from "@/components/onboarding/BillUpload";
+import { BillReview } from "@/components/onboarding/BillReview";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -35,16 +36,26 @@ export default function Index() {
 
     // Data states
     const [hasElectricBill, setHasElectricBill] = useState(false);
+    const [hasGasBill, setHasGasBill] = useState(false);
     const [points, setPoints] = useState(13); // Hardcoded to 13 as requested
     const [userName, setUserName] = useState<string>("Utente");
     const [lastBillData, setLastBillData] = useState<any>(null);
+    const [lastGasBillData, setLastGasBillData] = useState<any>(null);
 
     const {
         uploadAndAnalyzeBill,
         loading: billLoading,
         currentStep,
         analysisComplete,
-        proceedFromGame
+        proceedFromGame,
+        setBillType,
+        billAnalysis,
+        billData,
+        updateBillData,
+        completeOnboarding,
+        confirmBillData,
+        billFilePath,
+        setCurrentStep
     } = useOnboarding();
 
     useEffect(() => {
@@ -67,21 +78,37 @@ export default function Index() {
                     setUserName(firstName);
                 }
 
-                // Check if user has uploaded any bill and get the latest
-                const { data: bills, error } = await supabase
+                // Check if user has uploaded any ELECTRICITY bill and get the latest
+                const { data: electricityBills, error: eleError } = await supabase
                     .from('bill_uploads')
                     .select('*')
                     .eq('user_id', user.id)
+                    .neq('ocr_data->>bill_type', 'GAS') // Exclude GAS bills
                     .order('created_at', { ascending: false })
                     .limit(1);
 
-                if (!error && bills && bills.length > 0) {
+                if (!eleError && electricityBills && electricityBills.length > 0) {
                     setHasElectricBill(true);
-                    // Extract basic info from ocr_data if available
-                    // This assumes ocr_data structure, adjusting based on valid data
-                    const bill = bills[0];
+                    const bill = electricityBills[0];
                     if (bill.ocr_data) {
                         setLastBillData(bill.ocr_data);
+                    }
+                }
+
+                // Check if user has uploaded any GAS bill and get the latest
+                const { data: gasBills, error: gasError } = await supabase
+                    .from('bill_uploads')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('ocr_data->>bill_type', 'GAS') // Only GAS bills
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (!gasError && gasBills && gasBills.length > 0) {
+                    setHasGasBill(true);
+                    const bill = gasBills[0];
+                    if (bill.ocr_data) {
+                        setLastGasBillData(bill.ocr_data);
                     }
                 }
 
@@ -101,8 +128,19 @@ export default function Index() {
 
     const handleGameComplete = () => {
         proceedFromGame();
-        setBillDialogOpen(false);
-        window.location.reload();
+        // Do NOT close dialog or reload here. 
+        // proceedFromGame sets step to 3, which will trigger BillReview in the dialog.
+        setBillDialogOpen(true); // Ensure dialog is open
+    };
+
+    const handleReviewComplete = async () => {
+        // Save the confirmed data WITHOUT consent checks (since user is already onboarded)
+        const success = await confirmBillData();
+        if (success) {
+            setBillDialogOpen(false);
+            // Optional: refresh data or show success confetti
+            window.location.reload(); // Now it's safe to reload to update dashboard data
+        }
     };
 
     return (
@@ -190,7 +228,11 @@ export default function Index() {
                                 title="La tua Luce"
                                 subtitle="Scopri quanto puoi risparmiare"
                                 icon={<Upload className="h-5 w-5" />}
-                                onClick={() => setBillDialogOpen(true)}
+
+                                onClick={() => {
+                                    setBillType('ELECTRICITY');
+                                    setBillDialogOpen(true);
+                                }}
                                 className="bg-primary/5 border-primary/20"
                             >
                                 <div className="mt-2 flex flex-col items-start gap-4 h-full justify-between">
@@ -240,17 +282,61 @@ export default function Index() {
 
 
 
-                        {/* 3. Gas (Placeholder) */}
-                        <BentoCard
-                            title="Il tuo Gas"
-                            subtitle="In arrivo"
-                            icon={<Flame className="h-5 w-5" />}
-                            className="opacity-75"
-                        >
-                            <div className="mt-2 flex flex-col h-full justify-end">
-                                <p className="text-xs text-muted-foreground">Stiamo lavorando per aiutarti a risparmiare anche sul gas.</p>
-                            </div>
-                        </BentoCard>
+                        {!hasGasBill ? (
+                            <BentoCard
+                                title="Il tuo Gas"
+                                subtitle="Analizza la bolletta"
+                                icon={<Flame className="h-5 w-5" />}
+                                onClick={() => {
+                                    setBillType('GAS');
+                                    setBillDialogOpen(true);
+                                }}
+                                className="bg-orange-500/5 border-orange-500/20"
+                            >
+                                <div className="mt-2 flex flex-col h-full justify-between items-start gap-4">
+                                    <p className="text-sm text-muted-foreground">Scopri se stai pagando troppo per il riscaldamento.</p>
+                                    <Button size="sm" variant="outline" className="w-full border-orange-500/50 text-orange-600 hover:bg-orange-500/10 hover:text-orange-700">
+                                        Analizza Gas
+                                    </Button>
+                                </div>
+                            </BentoCard>
+                        ) : (
+                            <BentoCard
+                                title="Il tuo Gas"
+                                subtitle="Analisi e consumi"
+                                icon={<Flame className="h-5 w-5 text-orange-500" />}
+                                onClick={() => {
+                                    triggerHaptic('selection');
+                                    navigate('/utilities');
+                                }}
+                                className="group bg-orange-500/5 border-orange-500/20"
+                            >
+                                <div className="mt-2 space-y-1 relative">
+                                    <p className="text-[10px] uppercase text-muted-foreground font-medium">Consumo Annuo (Smc)</p>
+                                    <div className="flex items-end justify-between">
+                                        <div>
+                                            <p className="text-2xl font-bold text-foreground">
+                                                {lastGasBillData?.annual_consumption_reported || lastGasBillData?.annual_consumption_projected
+                                                    ? <NumberTicker value={Math.round(lastGasBillData.annual_consumption_reported || lastGasBillData.annual_consumption_projected)} />
+                                                    : "--"} <span className="text-sm font-medium text-muted-foreground">Smc</span>
+                                            </p>
+                                            <div className="flex items-center gap-1 text-orange-600 text-xs font-medium mt-2">
+                                                <TrendingDown className="h-3 w-3" />
+                                                <span>Ottimizzabile</span>
+                                            </div>
+                                        </div>
+                                        <div className="h-12 w-24 opacity-60 group-hover:opacity-100 transition-opacity">
+                                            <Sparkline
+                                                data={[120, 150, 100, 80, 40, 20, 10, 50, 90, 130, 160, 140]}
+                                                width={96}
+                                                height={48}
+                                                color="#F97316"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </BentoCard>
+                        )}
 
                         {/* 4. Upgrade (Interventions) */}
                         <BentoCard
@@ -290,9 +376,24 @@ export default function Index() {
                     <Dialog open={billDialogOpen} onOpenChange={setBillDialogOpen}>
                         <DialogContent className="max-w-md">
                             <DialogHeader>
-                                <DialogTitle>Carica Bolletta</DialogTitle>
+                                <DialogTitle>
+                                    {currentStep === 3 ? 'Verifica Risultati' : 'Carica Bolletta'}
+                                </DialogTitle>
                             </DialogHeader>
-                            <BillUpload onUpload={handleBillUpload} onSkip={() => setBillDialogOpen(false)} loading={billLoading} />
+                            {currentStep === 3 ? (
+                                <BillReview
+                                    billData={billData}
+                                    onUpdate={updateBillData}
+                                    onNext={handleReviewComplete}
+                                    filePath={billFilePath}
+                                />
+                            ) : (
+                                <BillUpload
+                                    onUpload={handleBillUpload}
+                                    onSkip={() => setBillDialogOpen(false)}
+                                    loading={billLoading}
+                                />
+                            )}
                         </DialogContent>
                     </Dialog>
                 </>

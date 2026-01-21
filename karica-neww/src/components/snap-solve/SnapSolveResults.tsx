@@ -22,7 +22,7 @@ interface SnapSolveResultsProps {
 }
 
 interface AnalysisData {
-  combined_energy_class: string;
+  combined_energy_class: string | null;
   estimated_extra_cost_yearly: number;
   recommendations: Recommendation[];
   bill_analysis: any;
@@ -117,9 +117,10 @@ export const SnapSolveResults = ({ open, onOpenChange, analysisId }: SnapSolveRe
 
       setAnalysis({
         ...data,
+        combined_energy_class: data.combined_energy_class || null,
         recommendations,
         calculation_details
-      });
+      } as AnalysisData);
     } catch (error) {
       console.error('Error loading analysis:', error);
     } finally {

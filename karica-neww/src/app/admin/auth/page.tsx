@@ -80,7 +80,7 @@ export default function AdminAuth() {
         if (!emailResult.success) {
             toast({
                 title: 'Errore',
-                description: emailResult.error.errors[0].message,
+                description: emailResult.error.issues[0].message,
                 variant: 'destructive',
             });
             return;
@@ -89,7 +89,7 @@ export default function AdminAuth() {
         if (!passwordResult.success) {
             toast({
                 title: 'Errore',
-                description: passwordResult.error.errors[0].message,
+                description: passwordResult.error.issues[0].message,
                 variant: 'destructive',
             });
             return;

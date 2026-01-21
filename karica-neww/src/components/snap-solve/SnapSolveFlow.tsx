@@ -27,11 +27,13 @@ interface SnapSolveFlowProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type Step = 'intro' | 'bill_choice' | 'bill' | 'bill_confirm' | 'heating' | 'heating_questionnaire' | 'heating_confirm' | 'external' | 'external_questionnaire' | 'external_confirm' | 'sqm' | 'analyzing' | 'results';
+type Step = 'intro' | 'bill_choice' | 'bill' | 'bill_confirm' | 'gas_bill' | 'gas_bill_confirm' | 'heating' | 'heating_questionnaire' | 'heating_confirm' | 'external' | 'external_questionnaire' | 'external_confirm' | 'sqm' | 'analyzing' | 'results';
 
 interface StepData {
   billImage: File | null;
   billAnalysis: any | null;
+  gasBillImage: File | null;
+  gasBillAnalysis: any | null;
   heatingImage: File | null;
   heatingAnalysis: any | null;
   externalImage: File | null;
@@ -49,7 +51,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
   const { user } = useAuth();
   const [step, setStep] = useState<Step>('intro');
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [currentCaptureType, setCurrentCaptureType] = useState<'bill' | 'heating' | 'external'>('bill');
+  const [currentCaptureType, setCurrentCaptureType] = useState<'bill' | 'gas' | 'heating' | 'external'>('bill');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -59,6 +61,8 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
   const [stepData, setStepData] = useState<StepData>({
     billImage: null,
     billAnalysis: null,
+    gasBillImage: null,
+    gasBillAnalysis: null,
     heatingImage: null,
     heatingAnalysis: null,
     externalImage: null,
@@ -82,7 +86,10 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
           .maybeSingle();
 
         if (!error && data && data.ocr_data) {
-          setExistingBill(data);
+          setExistingBill({
+            ...data,
+            created_at: data.created_at || new Date().toISOString()
+          });
         } else {
           setExistingBill(null);
         }
@@ -104,6 +111,8 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
       setStepData({
         billImage: null,
         billAnalysis: null,
+        gasBillImage: null,
+        gasBillAnalysis: null,
         heatingImage: null,
         heatingAnalysis: null,
         externalImage: null,
@@ -117,8 +126,9 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
   }, [open]);
 
   const steps = [
-    { id: 'bill', label: 'Bolletta', icon: FileText, description: 'Foto alla bolletta' },
-    { id: 'heating', label: 'Impianto', icon: Flame, description: 'Caldaia o condizionatore' },
+    { id: 'bill', label: 'Luce', icon: Zap, description: 'Bolletta Elettrica' },
+    { id: 'gas_bill', label: 'Gas', icon: Flame, description: 'Bolletta Gas' },
+    { id: 'heating', label: 'Impianto', icon: ThermometerSun, description: 'Caldaia o clima' },
     { id: 'external', label: 'Edificio', icon: Home, description: 'Caratteristiche casa' },
     { id: 'sqm', label: 'Metratura', icon: Ruler, description: 'Superficie casa' },
   ];
@@ -129,15 +139,17 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
       'bill_choice': 0,
       'bill': 0,
       'bill_confirm': 0,
-      'heating': 1,
-      'heating_questionnaire': 1,
-      'heating_confirm': 1,
-      'external': 2,
-      'external_questionnaire': 2,
-      'external_confirm': 2,
-      'sqm': 3,
-      'analyzing': 4,
-      'results': 5
+      'gas_bill': 1,
+      'gas_bill_confirm': 1,
+      'heating': 2,
+      'heating_questionnaire': 2,
+      'heating_confirm': 2,
+      'external': 3,
+      'external_questionnaire': 3,
+      'external_confirm': 3,
+      'sqm': 4,
+      'analyzing': 5,
+      'results': 6
     };
     return stepMap[step];
   };
@@ -215,7 +227,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
     return `${diffDays} giorni fa`;
   };
 
-  const handleStartCapture = (type: 'bill' | 'heating' | 'external') => {
+  const handleStartCapture = (type: 'bill' | 'gas' | 'heating' | 'external') => {
     setCurrentCaptureType(type);
     setCameraOpen(true);
   };
@@ -283,6 +295,8 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
 
   const processFile = async (file: File) => {
     setIsAnalyzing(true);
+    const isGas = currentCaptureType === 'gas' || step === 'gas_bill';
+    const functionName = isGas ? 'analisi-bolletta-gas' : 'analisi-bolletta-luce';
 
     try {
       // Create analysis record if first step
@@ -305,7 +319,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
 
       const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-bill`,
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/${functionName}`,
         {
           method: 'POST',
           headers: {
@@ -324,8 +338,8 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
 
       setStepData(prev => ({
         ...prev,
-        billImage: file,
-        billAnalysis: result.data,
+        [isGas ? 'gasBillImage' : 'billImage']: file,
+        [isGas ? 'gasBillAnalysis' : 'billAnalysis']: result.data,
       }));
 
       // Update home_analysis with bill data
@@ -333,15 +347,15 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
         await supabase
           .from('home_analysis')
           .update({
-            bill_analysis: result.data,
+            [isGas ? 'gas_bill_analysis' : 'bill_analysis']: result.data,
             updated_at: new Date().toISOString()
           })
           .eq('id', currentAnalysisId);
       }
 
       toast.success(file.type === 'application/pdf' ? 'PDF analizzato!' : 'Bolletta analizzata!');
-      // Go to bill confirmation step to show extracted data
-      setStep('bill_confirm');
+      // Go to bill confirmation step
+      setStep(isGas ? 'gas_bill_confirm' : 'bill_confirm');
 
     } catch (error) {
       console.error('File processing error:', error);
@@ -356,8 +370,8 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
 
     setCameraOpen(false);
 
-    // For bill, reuse processFile
-    if (currentCaptureType === 'bill') {
+    // For bills, reuse processFile
+    if (currentCaptureType === 'bill' || currentCaptureType === 'gas') {
       await processFile(file);
       return;
     }
@@ -382,7 +396,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
       // Use snap-solve function for heating/external
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('type', currentCaptureType);
+      formData.append('type', currentCaptureType as string);
       formData.append('analysisId', currentAnalysisId!);
 
       const { data: { session } } = await supabase.auth.getSession();
@@ -456,7 +470,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
         .from('home_analysis')
         .select('*')
         .eq('id', id)
-        .single();
+        .single() as any;
 
       if (error) throw error;
 
@@ -466,12 +480,14 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
 
       // Cast JSON types to proper interfaces
       const billData = analysis.bill_analysis as { annual_consumption?: number; confidence?: number } | null;
+      const gasBillData = analysis.gas_bill_analysis as { annual_consumption_reported?: number; annual_consumption_projected?: number; confidence?: number } | null;
       const heatingData = analysis.heating_analysis as Record<string, unknown> | null;
       const externalData = analysis.external_analysis as Record<string, unknown> | null;
       const sqm = stepData.squareMeters;
 
       const recommendations = generateRecommendations(
         billData as any,
+        gasBillData as any, // New arg
         heatingData as any,
         externalData as any,
         sqm
@@ -481,6 +497,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
         heatingData as any,
         externalData as any,
         billData?.annual_consumption,
+        gasBillData?.annual_consumption_reported || gasBillData?.annual_consumption_projected, // Use gas consumption
         sqm
       );
 
@@ -493,6 +510,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
       // Calculate transparency details
       const details = calculateDetails(
         billData?.annual_consumption || null,
+        gasBillData?.annual_consumption_reported || gasBillData?.annual_consumption_projected || null,
         sqm,
         (billData?.confidence as number) || 0.5,
         (heatingData?.confidence as number) || 0.5,
@@ -530,9 +548,11 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
   };
 
   const handleSkipStep = () => {
-    if (step === 'bill_choice') setStep('heating');
-    else if (step === 'bill') setStep('heating');
-    else if (step === 'bill_confirm') setStep('heating');
+    if (step === 'bill_choice') setStep('gas_bill');
+    else if (step === 'bill') setStep('gas_bill');
+    else if (step === 'bill_confirm') setStep('gas_bill');
+    else if (step === 'gas_bill') setStep('heating');
+    else if (step === 'gas_bill_confirm') setStep('heating');
     else if (step === 'heating') setStep('external');
     else if (step === 'heating_questionnaire') setStep('external');
     else if (step === 'external') setStep('sqm');
@@ -546,7 +566,9 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
     if (step === 'bill_choice') setStep('intro');
     else if (step === 'bill') setStep(existingBill ? 'bill_choice' : 'intro');
     else if (step === 'bill_confirm') setStep('bill');
-    else if (step === 'heating') setStep(stepData.billAnalysis ? 'bill_confirm' : 'bill');
+    else if (step === 'gas_bill') setStep(stepData.billAnalysis ? 'bill_confirm' : 'bill');
+    else if (step === 'gas_bill_confirm') setStep('gas_bill');
+    else if (step === 'heating') setStep(stepData.gasBillAnalysis ? 'gas_bill_confirm' : 'gas_bill');
     else if (step === 'heating_questionnaire') setStep('heating');
     else if (step === 'heating_confirm') setStep('heating');
     else if (step === 'external') setStep(stepData.heatingAnalysis ? 'heating_confirm' : 'heating');
@@ -646,7 +668,12 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
   };
 
   const handleConfirmBill = () => {
-    toast.success('Dati bolletta confermati!');
+    toast.success('Dati luce confermati!');
+    setStep('gas_bill');
+  };
+
+  const handleConfirmGasBill = () => {
+    toast.success('Dati gas confermati!');
     setStep('heating');
   };
 
@@ -660,10 +687,13 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
     setStep('sqm');
   };
 
-  const handleRetakePhoto = (type: 'bill' | 'heating' | 'external') => {
+  const handleRetakePhoto = (type: 'bill' | 'gas' | 'heating' | 'external') => {
     if (type === 'bill') {
       setStepData(prev => ({ ...prev, billImage: null, billAnalysis: null }));
       setStep('bill');
+    } else if (type === 'gas') {
+      setStepData(prev => ({ ...prev, gasBillImage: null, gasBillAnalysis: null }));
+      setStep('gas_bill');
     } else if (type === 'heating') {
       setStepData(prev => ({ ...prev, heatingImage: null, heatingAnalysis: null }));
       setStep('heating');
@@ -721,8 +751,10 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
             <DialogDescription>
               {step === 'intro' && 'Scopri quanta energia brucia la tua casa'}
               {step === 'bill_choice' && 'Vuoi usare la bolletta già caricata?'}
-              {step === 'bill' && 'Scatta una foto alla tua bolletta'}
-              {step === 'bill_confirm' && 'Verifica i dati estratti dalla bolletta'}
+              {step === 'bill' && 'Scatta una foto alla bolletta Luce'}
+              {step === 'bill_confirm' && 'Verifica i dati Luce'}
+              {step === 'gas_bill' && 'Scatta una foto alla bolletta Gas'}
+              {step === 'gas_bill_confirm' && 'Verifica i dati Gas'}
               {step === 'heating' && 'Fotografa la caldaia o il condizionatore'}
               {step === 'heating_confirm' && 'Verifica i dati rilevati dall\'impianto'}
               {step === 'external' && 'Caratteristiche del tuo edificio'}
@@ -733,7 +765,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
             </DialogDescription>
           </DialogHeader>
 
-          {step !== 'intro' && step !== 'bill_choice' && step !== 'analyzing' && step !== 'sqm' && step !== 'bill_confirm' && step !== 'heating_confirm' && step !== 'external_confirm' && renderStepIndicator()}
+          {step !== 'intro' && step !== 'bill_choice' && step !== 'analyzing' && step !== 'sqm' && step !== 'bill_confirm' && step !== 'gas_bill_confirm' && step !== 'heating_confirm' && step !== 'external_confirm' && renderStepIndicator()}
 
           <div className="space-y-4">
             {step === 'intro' && (

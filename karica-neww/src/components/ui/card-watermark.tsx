@@ -33,7 +33,7 @@ const CardWithWatermark = React.forwardRef<HTMLDivElement, CardWithWatermarkProp
       >
         {/* Watermark */}
         <img
-          src={karicaLogo}
+          src={karicaLogo.src}
           alt=""
           aria-hidden="true"
           className={cn(

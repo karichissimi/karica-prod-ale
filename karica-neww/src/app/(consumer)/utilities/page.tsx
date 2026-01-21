@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BillUpload } from "@/components/onboarding/BillUpload";
+import { BillReview } from "@/components/onboarding/BillReview";
 import { AnimatedStat } from "@/components/ui/animated-stat";
 import { ScrollReveal } from "@/components/ui/animated-stat";
 import { useOnboarding } from "@/hooks/useOnboarding";
@@ -59,8 +60,21 @@ export default function UtilitiesPage() {
     const [billDialogOpen, setBillDialogOpen] = useState(false);
     const [areraPopupOpen, setAreraPopupOpen] = useState(false);
     const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-    const { uploadAndAnalyzeBill, loading: billLoading } = useOnboarding();
-    const [billData, setBillData] = useState<BillData | null>(null);
+    const {
+        uploadAndAnalyzeBill,
+        loading: billLoading,
+        setBillType,
+        billType,
+        currentStep,
+        billData: contextBillData, // Rename to avoid conflict with local state
+        updateBillData,
+        completeOnboarding,
+        confirmBillData,
+        billFilePath,
+        setCurrentStep
+    } = useOnboarding();
+    const [electricBillData, setElectricBillData] = useState<BillData | null>(null);
+    const [gasBillData, setGasBillData] = useState<BillData | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -70,19 +84,19 @@ export default function UtilitiesPage() {
                 return;
             }
             try {
-                const { data, error } = await supabase
+                // Fetch Latest Electric Bill
+                const { data: electricData } = await supabase
                     .from('bill_uploads')
                     .select('ocr_data')
                     .eq('user_id', user.id)
+                    .neq('ocr_data->>bill_type', 'GAS') // Assume null or 'ELECTRICITY' is electric
                     .order('created_at', { ascending: false })
                     .limit(1)
                     .maybeSingle();
 
-                if (error) throw error;
-
-                if (data?.ocr_data) {
-                    const ocr = data.ocr_data as Record<string, unknown>;
-                    setBillData({
+                if (electricData?.ocr_data) {
+                    const ocr = electricData.ocr_data as Record<string, unknown>;
+                    setElectricBillData({
                         period_consumption: ocr.period_consumption as number | null,
                         period_start: ocr.period_start as string | null,
                         period_end: ocr.period_end as string | null,
@@ -95,6 +109,33 @@ export default function UtilitiesPage() {
                         price_kwh: ocr.price_kwh as number | null
                     });
                 }
+
+                // Fetch Latest Gas Bill
+                const { data: gasData } = await supabase
+                    .from('bill_uploads')
+                    .select('ocr_data')
+                    .eq('user_id', user.id)
+                    .eq('ocr_data->>bill_type', 'GAS')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (gasData?.ocr_data) {
+                    const ocr = gasData.ocr_data as Record<string, unknown>;
+                    setGasBillData({
+                        period_consumption: ocr.period_consumption as number | null,
+                        period_start: ocr.period_start as string | null,
+                        period_end: ocr.period_end as string | null,
+                        annual_consumption_projected: ocr.annual_consumption_projected as number | null,
+                        projection_method: ocr.projection_method as string | null,
+                        projection_details: ocr.projection_details as BillData['projection_details'],
+                        supplier: ocr.supplier as string | null,
+                        pod: (ocr.pdr || ocr.pod) as string | null, // Map PDR to POD field for display
+                        power_kw: null,
+                        price_kwh: 1.05 // Default Gas Price Smc approx
+                    });
+                }
+
             } catch (err) {
                 console.error('Error loading bill data:', err);
             } finally {
@@ -107,22 +148,45 @@ export default function UtilitiesPage() {
 
     const handleBillUpload = async (file: File) => {
         await uploadAndAnalyzeBill(file);
-        setBillDialogOpen(false);
-        window.location.reload();
+        // Do not close dialog or reload. Wait for game/review flow.
     };
 
-    const DEFAULT_PRICE_KWH = 0.25;
-    const priceKwh = billData?.price_kwh || DEFAULT_PRICE_KWH;
+    const handleReviewComplete = async () => {
+        const success = await confirmBillData();
+        if (success) {
+            setBillDialogOpen(false);
+            window.location.reload(); // Refresh data after successful save
+        }
+    };
+
+    // Effect to open dialog if we are in review step (e.g. game finished)
+    useEffect(() => {
+        if (currentStep === 3) {
+            setBillDialogOpen(true);
+        }
+    }, [currentStep]);
+
+    // Select data based on active tab
+    const currentBillData = activeTab === 'gas' ? gasBillData : electricBillData;
+    const DEFAULT_PRICE_KWH = activeTab === 'gas' ? 1.05 : 0.25;
+    const priceKwh = currentBillData?.price_kwh || DEFAULT_PRICE_KWH;
 
     const generateMonthlyData = (): MonthData[] => {
-        if (!billData?.annual_consumption_projected) return [];
-        const annual = billData.annual_consumption_projected;
-        const monthsCovered = billData.projection_details?.months_covered || [];
+        if (!currentBillData?.annual_consumption_projected) return [];
+        const annual = currentBillData.annual_consumption_projected;
+        // Use gas profile if available, otherwise generic ARERA (this is simplified for chart)
+        // Ideally we should save the profile used in DB and reuse it here
+        const profileToUse = (activeTab === 'gas' && currentBillData.projection_details?.arera_profile)
+            ? currentBillData.projection_details.arera_profile // Fixed: Access arera_profile
+            : ARERA_PROFILE;
+
+        const monthsCovered = currentBillData.projection_details?.months_covered || [];
         const currentMonth = new Date().getMonth() + 1;
 
-        return Object.entries(ARERA_PROFILE).map(([month, weight]) => {
+        return Object.entries(profileToUse || ARERA_PROFILE).map(([month, weight]) => {
             const monthNum = parseInt(month);
-            const consumption = Math.round(annual * weight);
+            const w = weight as number; // Fixed: Cast weight
+            const consumption = Math.round(annual * w);
             const costoEur = Math.round(consumption * priceKwh * 100) / 100;
             const isCovered = monthsCovered.includes(monthNum);
             const isCurrent = monthNum === currentMonth;
@@ -134,13 +198,13 @@ export default function UtilitiesPage() {
                 isCovered,
                 isCurrent,
                 monthNum,
-                weight: weight * 100
+                weight: w * 100
             };
         });
     };
 
     const monthlyData = generateMonthlyData();
-    const avgMonthly = billData?.annual_consumption_projected ? Math.round(billData.annual_consumption_projected / 12) : 0;
+    const avgMonthly = currentBillData?.annual_consumption_projected ? Math.round(currentBillData.annual_consumption_projected / 12) : 0;
     const avgMonthlyEur = Math.round(avgMonthly * priceKwh * 100) / 100;
     const coveredMonthsCount = monthlyData.filter(m => m.isCovered).length;
     const selectedMonthData = selectedMonth ? monthlyData.find(d => d.monthNum === selectedMonth) : null;
@@ -149,7 +213,7 @@ export default function UtilitiesPage() {
         const baseClasses = clickable ? "cursor-pointer hover:opacity-80 transition-opacity" : "";
         const onClick = clickable ? () => setAreraPopupOpen(true) : undefined;
 
-        switch (billData?.projection_method) {
+        switch (currentBillData?.projection_method) {
             case 'historical_complete':
                 return <Badge variant="default" className={`bg-green-500/10 text-green-600 border-green-500/20 ${baseClasses}`} onClick={onClick}>🟢 Dato reale {clickable && <Info className="h-3 w-3 ml-1" />}</Badge>;
             case 'historical_partial':
@@ -190,7 +254,7 @@ export default function UtilitiesPage() {
                 ) : (
                     <>
                         <TabsContent value="electric" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            {!billData ? (
+                            {!electricBillData ? (
                                 <Card className="p-8 text-center space-y-6 border-dashed border-2">
                                     <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                                         <FileText className="h-8 w-8 text-primary" />
@@ -201,13 +265,19 @@ export default function UtilitiesPage() {
                                             Carica la tua ultima bolletta luce per vedere l'analisi dei consumi e scoprire quanto puoi risparmiare.
                                         </p>
                                     </div>
-                                    <Button size="lg" onClick={() => setBillDialogOpen(true)} className="gap-2">
+                                    <Button size="lg" onClick={() => {
+                                        setBillType('ELECTRICITY');
+                                        setBillDialogOpen(true);
+                                    }} className="gap-2">
                                         <Upload className="h-5 w-5" /> Carica Bolletta Luce
                                     </Button>
                                 </Card>
                             ) : (
                                 <>
-                                    <SupplyCard onUpdateBill={() => setBillDialogOpen(true)} />
+                                    <SupplyCard onUpdateBill={() => {
+                                        setBillType('ELECTRICITY');
+                                        setBillDialogOpen(true);
+                                    }} />
 
                                     <div className="grid grid-cols-2 gap-4">
                                         <Card className="p-4 bg-card/50">
@@ -228,7 +298,7 @@ export default function UtilitiesPage() {
                                                 </div>
                                                 <div className="min-w-0">
                                                     <p className="text-xs text-muted-foreground">Totale Annuo</p>
-                                                    <p className="text-xl font-bold">~<AnimatedStat end={Math.round(billData.annual_consumption_projected! * priceKwh)} decimals={0} suffix="€" /></p>
+                                                    <p className="text-xl font-bold">~<AnimatedStat end={Math.round(electricBillData.annual_consumption_projected! * priceKwh)} decimals={0} suffix="€" /></p>
                                                 </div>
                                             </div>
                                         </Card>
@@ -289,21 +359,97 @@ export default function UtilitiesPage() {
                             )}
                         </TabsContent>
 
+
+
                         <TabsContent value="gas" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <Card className="p-8 text-center space-y-6 border-dashed border-2">
-                                <div className="mx-auto w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center">
-                                    <Flame className="h-8 w-8 text-orange-500" />
-                                </div>
-                                <div className="space-y-2">
-                                    <h3 className="text-xl font-semibold">Bolletta Gas</h3>
-                                    <p className="text-muted-foreground max-w-sm mx-auto">
-                                        La gestione delle bollette Gas è in arrivo! Presto potrai monitorare anche i tuoi consumi di gas e risparmiare.
-                                    </p>
-                                </div>
-                                <Button size="lg" disabled className="gap-2">
-                                    <Upload className="h-5 w-5" /> Carica Bolletta Gas (Presto)
-                                </Button>
-                            </Card>
+                            {!gasBillData ? (
+                                <Card className="p-8 text-center space-y-6 border-dashed border-2">
+                                    <div className="mx-auto w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center">
+                                        <Flame className="h-8 w-8 text-orange-500" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h3 className="text-xl font-semibold">Bolletta Gas</h3>
+                                        <p className="text-muted-foreground max-w-sm mx-auto">
+                                            Carica la tua bolletta del gas per analizzare i consumi invernali e scoprire se puoi risparmiare.
+                                        </p>
+                                    </div>
+                                    <Button size="lg" onClick={() => {
+                                        setBillType('GAS');
+                                        setBillDialogOpen(true);
+                                    }} className="gap-2">
+                                        <Upload className="h-5 w-5" /> Carica Bolletta Gas
+                                    </Button>
+                                </Card>
+                            ) : (
+                                <>
+                                    <SupplyCard onUpdateBill={() => {
+                                        setBillType('GAS');
+                                        setBillDialogOpen(true);
+                                    }} />
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Card className="p-4 bg-card/50">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 rounded-lg bg-orange-500/10">
+                                                    <Calendar className="h-5 w-5 text-orange-600" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs text-muted-foreground">Media Mensile</p>
+                                                    <p className="text-xl font-bold">~<AnimatedStat end={avgMonthlyEur} decimals={0} suffix="€" /></p>
+                                                </div>
+                                            </div>
+                                        </Card>
+                                        <Card className="p-4 bg-card/50" onClick={() => setAreraPopupOpen(true)}>
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 rounded-lg bg-accent/10">
+                                                    <TrendingUp className="h-5 w-5 text-accent" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs text-muted-foreground">Totale Annuo</p>
+                                                    <p className="text-xl font-bold">~<AnimatedStat end={Math.round(gasBillData.annual_consumption_projected! * priceKwh)} decimals={0} suffix="€" /></p>
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    </div>
+
+                                    {/* GAS Monthly Consumption Chart (Reused Logic) */}
+                                    {/* We reuse the same chart logic because 'monthlyData' is now reactive to activeTab */}
+                                    <CardWithWatermark className="p-6 glass-effect" watermarkPosition="bottom-right" watermarkSize="lg" watermarkOpacity={0.04}>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h3 className="text-xl font-semibold">Consumi Gas (Smc)</h3>
+                                            {getProjectionBadge(true)}
+                                        </div>
+                                        <div className="h-[250px] w-full mt-4">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={monthlyData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }} onClick={(data: any) => {
+                                                    if (data && data.activePayload) {
+                                                        const clickedMonth = data.activePayload[0].payload.monthNum;
+                                                        setSelectedMonth(selectedMonth === clickedMonth ? null : clickedMonth);
+                                                    }
+                                                }}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                                                    <XAxis dataKey="mese" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '10px' }} tickLine={false} axisLine={false} />
+                                                    <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '10px' }} tickLine={false} axisLine={false} tickFormatter={value => `${value}`} />
+                                                    <Tooltip cursor={{ fill: 'hsl(var(--muted) / 0.3)' }} content={({ active, payload }) => {
+                                                        if (!active || !payload?.[0]) return null;
+                                                        const data = payload[0].payload as MonthData;
+                                                        return (
+                                                            <div className="bg-card border rounded-lg p-3 shadow-lg">
+                                                                <p className="font-semibold">{MONTH_FULL_NAMES[data.monthNum - 1]}</p>
+                                                                <p className="text-lg font-bold text-orange-600">~{data.costoEur.toFixed(0)}€</p>
+                                                                <p className="text-sm text-muted-foreground">{data.consumo.toLocaleString()} Smc</p>
+                                                            </div>
+                                                        );
+                                                    }} />
+                                                    <Bar dataKey="consumo" radius={[4, 4, 0, 0]} cursor="pointer">
+                                                        {monthlyData.map((entry, index) => <Cell key={`cell-${index}`} fill={selectedMonth === entry.monthNum ? 'hsl(var(--orange-500))' : entry.isCurrent ? 'hsl(var(--orange-500) / 0.8)' : entry.isCovered ? 'hsl(var(--orange-500) / 0.5)' : 'hsl(var(--muted-foreground) / 0.3)'} />)}
+                                                    </Bar>
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </CardWithWatermark>
+                                </>
+                            )}
 
                             <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
                                 <div className="flex items-start gap-4">
@@ -327,13 +473,28 @@ export default function UtilitiesPage() {
             <Dialog open={billDialogOpen} onOpenChange={setBillDialogOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Carica Bolletta Luce</DialogTitle>
+                        <DialogTitle>
+                            {currentStep === 3 ? 'Verifica Risultati' : `Carica Bolletta ${billType === 'GAS' ? 'Gas' : 'Luce'}`}
+                        </DialogTitle>
                     </DialogHeader>
-                    <BillUpload onUpload={handleBillUpload} onSkip={() => setBillDialogOpen(false)} loading={billLoading} />
+                    {currentStep === 3 ? (
+                        <BillReview
+                            billData={contextBillData}
+                            onUpdate={updateBillData}
+                            onNext={handleReviewComplete}
+                            filePath={billFilePath}
+                        />
+                    ) : (
+                        <BillUpload
+                            onUpload={handleBillUpload}
+                            onSkip={() => setBillDialogOpen(false)}
+                            loading={billLoading}
+                        />
+                    )}
                 </DialogContent>
             </Dialog>
 
-            <AreraExplanationPopup open={areraPopupOpen} onOpenChange={setAreraPopupOpen} annualConsumption={billData?.annual_consumption_projected || null} projectionMethod={billData?.projection_method || null} monthsCovered={billData?.projection_details?.months_covered || []} selectedMonth={selectedMonth} onMonthSelect={setSelectedMonth} priceKwh={priceKwh} />
-        </div>
+            <AreraExplanationPopup open={areraPopupOpen} onOpenChange={setAreraPopupOpen} annualConsumption={currentBillData?.annual_consumption_projected || null} projectionMethod={currentBillData?.projection_method || null} monthsCovered={currentBillData?.projection_details?.months_covered || []} selectedMonth={selectedMonth} onMonthSelect={setSelectedMonth} priceKwh={priceKwh} />
+        </div >
     );
 }

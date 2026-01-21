@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
-import { BillData } from '@/hooks/useOnboarding';
+import { BillData, useOnboarding } from '@/hooks/useOnboarding';
 import { PdfPreview } from './PdfPreview';
 
 interface BillReviewProps {
@@ -14,7 +14,9 @@ interface BillReviewProps {
 }
 
 export const BillReview = ({ billData, onUpdate, onNext, filePath }: BillReviewProps) => {
+  const { billType } = useOnboarding();
   const isValid = billData.pod && billData.supplier && billData.annualConsumption > 0;
+  const isGas = billType === 'GAS';
 
   return (
     <div className="space-y-6">
@@ -36,7 +38,7 @@ export const BillReview = ({ billData, onUpdate, onNext, filePath }: BillReviewP
         <CardContent className="p-6 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="pod">
-              POD (Punto di Prelievo) <span className="text-destructive">*</span>
+              {isGas ? 'PDR (Punto di Riconsegna)' : 'POD (Punto di Prelievo)'} <span className="text-destructive">*</span>
             </Label>
             <Input
               id="pod"
@@ -52,7 +54,7 @@ export const BillReview = ({ billData, onUpdate, onNext, filePath }: BillReviewP
               </p>
             )}
             <p className="text-xs text-muted-foreground">
-              Codice di 14 caratteri che inizia con IT
+              {isGas ? 'Codice di 14 cifre numeriche' : 'Codice di 14 caratteri che inizia con IT'}
             </p>
           </div>
 
@@ -77,7 +79,7 @@ export const BillReview = ({ billData, onUpdate, onNext, filePath }: BillReviewP
 
           <div className="space-y-2">
             <Label htmlFor="consumption">
-              Consumo Annuo (kWh) <span className="text-destructive">*</span>
+              Consumo Annuo ({isGas ? 'Smc' : 'kWh'}) <span className="text-destructive">*</span>
             </Label>
             <Input
               id="consumption"

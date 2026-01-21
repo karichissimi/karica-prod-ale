@@ -112,13 +112,17 @@ const Interventions = () => {
             const { data, error } = await supabase
                 .from('home_analysis')
                 .select('id, combined_energy_class, estimated_extra_cost_yearly, recommendations, completed_at, confidence_level, bill_analysis, calculation_details')
+                // .select('id, combined_energy_class, estimated_extra_cost_yearly, recommendations, completed_at, confidence_level, bill_analysis') // Removed calculation_details for debug
                 .eq('user_id', user.id)
                 .eq('status', 'completed')
                 .order('completed_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
 
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase Query Error:', JSON.stringify(error, null, 2));
+                throw error;
+            }
 
             if (data) {
                 setLatestAnalysis({

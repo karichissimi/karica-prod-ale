@@ -10,6 +10,12 @@ interface BillAnalysis {
   confidence?: number;
 }
 
+export interface GasBillAnalysis {
+  annual_consumption_reported?: number | null;
+  annual_consumption_projected?: number | null;
+  confidence?: number;
+}
+
 interface HeatingAnalysis {
   brand?: string | null;
   model?: string | null;
@@ -57,6 +63,7 @@ export interface CalculationDetails {
   energy_index_kwh_m2: number | null;
   square_meters: number | null;
   annual_consumption_kwh: number | null;
+  annual_consumption_smc: number | null;
   calculation_method: 'measured' | 'estimated';
   reference_standard: string;
   energy_prices: {
@@ -121,7 +128,7 @@ const ENERGY_PRICES = {
 function getBoilerEfficiency(year: number | null, type: string | null): { efficiency: number; source: string } {
   const currentYear = new Date().getFullYear();
   const age = year ? currentYear - year : 15;
-  
+
   // Caldaie a condensazione
   if (type === 'caldaia_condensazione') {
     if (age <= 5) return { efficiency: 0.94, source: 'ENEA - Caldaie condensazione recenti' };
@@ -129,7 +136,7 @@ function getBoilerEfficiency(year: number | null, type: string | null): { effici
     if (age <= 15) return { efficiency: 0.85, source: 'ENEA - Degradamento stimato' };
     return { efficiency: 0.80, source: 'ENEA - Caldaie condensazione datate' };
   }
-  
+
   // Caldaie tradizionali
   if (type === 'caldaia_tradizionale' || !type) {
     if (age <= 10) return { efficiency: 0.82, source: 'ENEA - Caldaie tradizionali buone condizioni' };
@@ -137,14 +144,14 @@ function getBoilerEfficiency(year: number | null, type: string | null): { effici
     if (age <= 20) return { efficiency: 0.68, source: 'ENEA - Caldaie pre-2005' };
     return { efficiency: 0.60, source: 'ENEA - Caldaie anni 90 o precedenti' };
   }
-  
+
   // Pompe di calore
   if (type === 'pompa_calore') {
     if (age <= 5) return { efficiency: 3.5, source: 'ENEA - COP medio PDC recenti' }; // COP
     if (age <= 10) return { efficiency: 3.0, source: 'ENEA - PDC degradate' };
     return { efficiency: 2.5, source: 'ENEA - PDC datate' };
   }
-  
+
   return { efficiency: 0.75, source: 'Stima generica' };
 }
 
@@ -171,7 +178,7 @@ function calculateHeatingReplacement(
 ): Recommendation | null {
   const age = getHeatingSystemAge(heating);
   const deviceType = heating?.device_type || 'caldaia_tradizionale';
-  
+
   // Non suggerire se caldaia recente a condensazione o PDC
   if (age < 8 && (deviceType === 'caldaia_condensazione' || deviceType === 'pompa_calore')) {
     return null;
@@ -179,17 +186,17 @@ function calculateHeatingReplacement(
 
   const currentEff = getBoilerEfficiency(heating?.estimated_year || null, deviceType);
   const newEff = { efficiency: 0.94, source: 'Caldaia condensazione classe A+' };
-  
+
   // Calcolo risparmio
   const heatingShare = 0.65; // 65% consumo per riscaldamento (fonte ENEA)
   const heatingConsumption = consumption * heatingShare;
   const currentCost = heatingConsumption * ENERGY_PRICES.gas_kwh / currentEff.efficiency;
   const newCost = heatingConsumption * ENERGY_PRICES.gas_kwh / newEff.efficiency;
-  
+
   const annualSavingsMid = Math.round(currentCost - newCost);
   const annualSavingsMin = Math.round(annualSavingsMid * 0.75);
   const annualSavingsMax = Math.round(annualSavingsMid * 1.25);
-  
+
   if (annualSavingsMid < 80) return null;
 
   // Costi installazione (fonte: Osservatorio prezzi MISE 2024)
@@ -212,7 +219,7 @@ function calculateHeatingReplacement(
   return {
     intervention_type: 'heating',
     title: 'Sostituzione Impianto Termico',
-    description: heating?.brand 
+    description: heating?.brand
       ? `${heating.brand} del ${heating.estimated_year || '~2010'} → Caldaia condensazione classe A+`
       : `Impianto di circa ${age} anni → Caldaia condensazione classe A+`,
     estimated_savings_min: annualSavingsMin,
@@ -243,13 +250,13 @@ function calculateWindowReplacement(
   external: ExternalAnalysis | null
 ): Recommendation | null {
   if (!external) return null;
-  
+
   const windowType = external.window_type;
   const frameMaterial = external.window_frame_material;
-  
+
   // Non suggerire se infissi già buoni
-  if (windowType === 'triplo_vetro' || 
-      (windowType === 'vetro_doppio' && (frameMaterial === 'pvc' || frameMaterial === 'alluminio_taglio_termico'))) {
+  if (windowType === 'triplo_vetro' ||
+    (windowType === 'vetro_doppio' && (frameMaterial === 'pvc' || frameMaterial === 'alluminio_taglio_termico'))) {
     return null;
   }
 
@@ -263,27 +270,27 @@ function calculateWindowReplacement(
   const transmittanceNew = 1.1; // Triplo vetro PVC classe A
 
   const uOld = windowType === 'vetro_singolo' ? transmittanceOld.vetro_singolo :
-               frameMaterial === 'legno_vecchio' ? transmittanceOld.vetro_doppio_legno_vecchio :
-               frameMaterial === 'alluminio' ? transmittanceOld.vetro_doppio_alluminio :
-               transmittanceOld.vetro_doppio;
+    frameMaterial === 'legno_vecchio' ? transmittanceOld.vetro_doppio_legno_vecchio :
+      frameMaterial === 'alluminio' ? transmittanceOld.vetro_doppio_alluminio :
+        transmittanceOld.vetro_doppio;
 
   // Stima superficie finestrata (15-20% superficie calpestabile)
   const windowArea = squareMeters ? squareMeters * 0.15 : 18; // default 120m² * 15%
-  
+
   // Gradi giorno zona E (Milano) e ore riscaldamento
   const gradiGiorno = 2400;
   const oreRiscaldamento = 14 * 180; // 14h/giorno x 180 giorni
-  
+
   // Energia dispersa (kWh) = U * A * ΔT * ore / 1000
   const deltaT = 20; // differenza media interno-esterno
   const energyLossOld = (uOld * windowArea * deltaT * oreRiscaldamento) / 1000;
   const energyLossNew = (transmittanceNew * windowArea * deltaT * oreRiscaldamento) / 1000;
   const energySaved = energyLossOld - energyLossNew;
-  
+
   const annualSavingsMid = Math.round(energySaved * ENERGY_PRICES.gas_kwh);
   const annualSavingsMin = Math.round(annualSavingsMid * 0.70);
   const annualSavingsMax = Math.round(annualSavingsMid * 1.30);
-  
+
   if (annualSavingsMid < 60) return null;
 
   // Costi infissi (fonte: Prezzi informativi ANCE 2024)
@@ -335,9 +342,9 @@ function calculateInsulation(
   external: ExternalAnalysis | null
 ): Recommendation | null {
   if (!external) return null;
-  
+
   if (external.insulation_visible === 'cappotto_termico') return null;
-  
+
   // Trasmittanza pareti per epoca costruttiva (fonte: ENEA)
   const transmittanceByAge: Record<string, { u: number; description: string }> = {
     'pre_1970': { u: 1.8, description: 'Muratura piena senza isolamento' },
@@ -346,29 +353,29 @@ function calculateInsulation(
     '2005_2015': { u: 0.45, description: 'Isolamento D.Lgs 192/05' },
     'post_2015': { u: 0.28, description: 'nZEB o quasi' }
   };
-  
+
   const buildingAge = external.building_age_estimate || '1970_1990';
   const wallData = transmittanceByAge[buildingAge] || transmittanceByAge['1970_1990'];
   const uNew = 0.22; // Cappotto 12cm EPS - limite DM 26/06/2015 zona E
-  
+
   if (wallData.u <= 0.35) return null; // Già ben isolato
-  
+
   // Stima superficie pareti disperdenti (circa 1.2x superficie calpestabile per appartamento)
   const wallArea = squareMeters ? squareMeters * 1.2 : 120;
-  
+
   // Gradi giorno e calcolo
   const gradiGiorno = 2400;
   const oreRiscaldamento = 14 * 180;
   const deltaT = 20;
-  
+
   const energyLossOld = (wallData.u * wallArea * deltaT * oreRiscaldamento) / 1000;
   const energyLossNew = (uNew * wallArea * deltaT * oreRiscaldamento) / 1000;
   const energySaved = energyLossOld - energyLossNew;
-  
+
   const annualSavingsMid = Math.round(energySaved * ENERGY_PRICES.gas_kwh);
   const annualSavingsMin = Math.round(annualSavingsMid * 0.65);
   const annualSavingsMax = Math.round(annualSavingsMid * 1.35);
-  
+
   if (annualSavingsMid < 120) return null;
 
   // Costi cappotto (fonte: DEI Prezzi Tipologie Edilizie 2024)
@@ -427,15 +434,15 @@ function calculateSolarPanels(
   const targetCoverage = 0.70; // Copertura 70% consumi
   const kWpNeeded = Math.ceil((consumption * targetCoverage) / kWhPerKWp);
   const kWpSystem = Math.min(Math.max(kWpNeeded, 3), 6); // Min 3kWp, max 6kWp
-  
+
   const annualProduction = kWpSystem * kWhPerKWp;
   const selfConsumption = 0.35; // 35% autoconsumo diretto (fonte GSE)
   const gridExchange = 0.65; // 65% immesso e ripreso con Scambio sul Posto
   const sspValue = 0.12; // Valore SSP medio €/kWh
-  
+
   const savingsDirectConsumption = annualProduction * selfConsumption * ENERGY_PRICES.electricity_kwh;
   const savingsSSP = annualProduction * gridExchange * sspValue;
-  
+
   const annualSavingsMid = Math.round(savingsDirectConsumption + savingsSSP);
   const annualSavingsMin = Math.round(annualSavingsMid * 0.80);
   const annualSavingsMax = Math.round(annualSavingsMid * 1.20);
@@ -481,13 +488,40 @@ function calculateSolarPanels(
 export function calculateCombinedEnergyClass(
   heating: HeatingAnalysis | null,
   external: ExternalAnalysis | null,
-  consumption?: number | null,
+  electricity_consumption?: number | null,
+  gas_consumption?: number | null,
   squareMeters?: number | null
 ): string {
   // Metodo 1: Calcolo da consumi reali (più affidabile)
-  if (consumption && squareMeters && squareMeters > 0) {
-    const epIndex = consumption / squareMeters;
-    return getEnergyClassFromEP(epIndex);
+  // Convertiamo tutto in kWh primari (approx: 1 Smc Gas = 10.7 kWh, 1 kWh Elettrico = 1.95 kWh primari per APE o 1:1 per bollette)
+  // Per semplicità qui usiamo kWh termici equivalenti:
+  // Gas: 1 Smc = 10.7 kWh
+  // Luce: 1 kWh = 1 kWh (se pdc) o disperdente.
+
+  if (squareMeters && squareMeters > 0) {
+    let totalKwh = 0;
+    let hasData = false;
+
+    if (gas_consumption) {
+      totalKwh += gas_consumption * 10.7;
+      hasData = true;
+    }
+
+    // Se non c'è gas, assumiamo riscaldamento elettrico o nullo se c'è solo luce
+    // Se c'è luce, aggiungiamo (ma attenzione ai consumi non termici)
+    if (electricity_consumption) {
+      // Stima: 70% luce è usi domestici, 30% potrebbe essere clima/pdc se non c'è gas
+      // Se c'è gas, la luce incide poco sul riscaldamento
+      if (!gas_consumption) {
+        totalKwh += electricity_consumption; // Assumiamo tutto elettrico
+        hasData = true;
+      }
+    }
+
+    if (hasData) {
+      const epIndex = totalKwh / squareMeters;
+      return getEnergyClassFromEP(epIndex);
+    }
   }
 
   // Metodo 2: Stima AI dall'esterno
@@ -513,7 +547,7 @@ export function calculateCombinedEnergyClass(
   if (heatingAge > 20) return 'F';
   if (heatingAge > 15) return 'E';
   if (heatingAge > 10) return 'D';
-  
+
   return 'D';
 }
 
@@ -526,7 +560,7 @@ export function calculateExtraCostYearly(
   const extraKwhM2 = CLASS_EXTRA_KWH_M2[energyClass] || 150;
   const area = squareMeters || 100;
   const extraKwh = extraKwhM2 * area;
-  
+
   // Costo extra = energia sprecata × prezzo medio (mix gas/elettrico)
   const avgPrice = (ENERGY_PRICES.gas_kwh + ENERGY_PRICES.electricity_kwh) / 2;
   return Math.round(extraKwh * avgPrice);
@@ -534,25 +568,34 @@ export function calculateExtraCostYearly(
 
 // Calcola dettagli per trasparenza
 export function calculateDetails(
-  consumption: number | null,
+  electricity_consumption: number | null,
+  gas_consumption: number | null,
   squareMeters: number | null,
   billConfidence: number,
   heatingConfidence: number,
   externalConfidence: number
 ): CalculationDetails {
-  const epIndex = consumption && squareMeters ? consumption / squareMeters : null;
-  
+  // Calcolo indice EP per display
+  let epIndex: number | null = null;
+  if (squareMeters) {
+    const gasKwh = (gas_consumption || 0) * 10.7;
+    const elecKwh = (electricity_consumption || 0);
+    const total = gasKwh + elecKwh;
+    if (total > 0) epIndex = total / squareMeters;
+  }
+
   // Calcola confidence complessiva
   const weights = { bill: 0.4, heating: 0.3, external: 0.3 };
-  const overall = (billConfidence * weights.bill) + 
-                  (heatingConfidence * weights.heating) + 
-                  (externalConfidence * weights.external);
-  
+  const overall = (billConfidence * weights.bill) +
+    (heatingConfidence * weights.heating) +
+    (externalConfidence * weights.external);
+
   return {
     energy_index_kwh_m2: epIndex ? Math.round(epIndex) : null,
     square_meters: squareMeters,
-    annual_consumption_kwh: consumption,
-    calculation_method: consumption ? 'measured' : 'estimated',
+    annual_consumption_kwh: electricity_consumption,
+    annual_consumption_smc: gas_consumption,
+    calculation_method: (electricity_consumption || gas_consumption) ? 'measured' : 'estimated',
     reference_standard: 'DM 26/06/2015 - Linee guida nazionali certificazione energetica',
     energy_prices: {
       electricity_kwh: ENERGY_PRICES.electricity_kwh,
@@ -572,25 +615,40 @@ export function calculateDetails(
 // Funzione principale: genera raccomandazioni
 export function generateRecommendations(
   bill: BillAnalysis | null,
+  gasBill: GasBillAnalysis | null,
   heating: HeatingAnalysis | null,
   external: ExternalAnalysis | null,
   squareMeters?: number | null
 ): Recommendation[] {
-  const consumption = bill?.annual_consumption || 3000;
+  const electricity = bill?.annual_consumption || 0;
+  const gas = gasBill?.annual_consumption_reported || gasBill?.annual_consumption_projected || 0;
+
+  // Totale kWh termici equivalenti per stimare potenziale risparmio
+  const totalKwhEquivalent = (gas * 10.7) + electricity;
+  // Se abbiamo 0 spaccato, usiamo default 3000 (come kWh eq)
+  const consumptionBase = totalKwhEquivalent || 15000; // 15000 kWh ≈ 1400 Smc (default consumo medio famiglia)
+
   const area = squareMeters || null;
-  
+
   const recommendations: Recommendation[] = [];
 
-  const heatingRec = calculateHeatingReplacement(consumption, area, heating);
+  // Passiamo il consumo convertito in "gas equivalente" (kWh) per le funzioni esistenti che si aspettano kWh base gas?
+  // Le funzioni attuali `calculateHeatingReplacement` usano `consumption` e poi `gas_kwh`.
+  // Dobbiamo assicurarci che `consumption` passato alle sotto-funzioni sia coerente.
+  // Attualmente calculateHeatingReplacement usa: heatingConsumption = consumption * 0.65.
+  // Se consumption è in kWh termici, va bene.
+
+  const heatingRec = calculateHeatingReplacement(consumptionBase, area, heating);
   if (heatingRec) recommendations.push(heatingRec);
 
-  const windowRec = calculateWindowReplacement(consumption, area, external);
+  const windowRec = calculateWindowReplacement(consumptionBase, area, external);
   if (windowRec) recommendations.push(windowRec);
 
-  const insulationRec = calculateInsulation(consumption, area, external);
+  const insulationRec = calculateInsulation(consumptionBase, area, external);
   if (insulationRec) recommendations.push(insulationRec);
 
-  const solarRec = calculateSolarPanels(consumption, area, external);
+  // Per il solare, conta solo l'elettrico
+  const solarRec = calculateSolarPanels(electricity || 2700, area, external);
   if (solarRec) recommendations.push(solarRec);
 
   // Ordina per priorità poi per ROI
