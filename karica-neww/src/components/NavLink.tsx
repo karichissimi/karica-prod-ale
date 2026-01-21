@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
-interface NavLinkCompatProps extends Omit<LinkProps, "children" | "className"> {
+interface NavLinkCompatProps extends Omit<LinkProps, "children" | "className" | "href"> {
   to: string; // Map 'to' to 'href'
   className?: string | ((props: { isActive: boolean; isPending: boolean }) => string);
   activeClassName?: string;

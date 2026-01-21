@@ -42,11 +42,11 @@ export function DirectSelectionFlow({ onComplete, onBack, preselectedInterventio
   const [isPreselected] = useState(!!preselectedInterventionName);
   // Track if we're still auto-selecting (waiting for intervention types to load)
   const [autoSelecting, setAutoSelecting] = useState(!!preselectedInterventionName);
-  
+
   const [selectedIntervention, setSelectedIntervention] = useState("");
   const [selectedPartner, setSelectedPartner] = useState("");
   const [notes, setNotes] = useState("");
-  
+
   // Step starts at 1 unless we have a preselected intervention AND it has been auto-selected
   const [step, setStep] = useState(1);
 
@@ -57,19 +57,39 @@ export function DirectSelectionFlow({ onComplete, onBack, preselectedInterventio
   // Auto-select intervention if preselected name is provided
   useEffect(() => {
     if (preselectedInterventionName && interventionTypes.length > 0 && autoSelecting) {
-      // Try exact match first (case-insensitive)
-      let matchingType = interventionTypes.find(t => 
+      const normalizeForMatch = (s: string) => s.toLowerCase()
+        .replace(/impianto\s+/g, '')
+        .replace(/sistema\s+di\s+/g, '')
+        .replace(/sostituzione\s+/g, '')
+        .replace(/installazione\s+/g, '')
+        .trim();
+
+      const target = normalizeForMatch(preselectedInterventionName);
+
+      // 1. Try exact/partial match on raw strings
+      let matchingType = interventionTypes.find(t =>
         t.name.toLowerCase() === preselectedInterventionName.toLowerCase()
       );
-      
-      // Fallback to partial match
+
+      // 2. Try normalized match
       if (!matchingType) {
-        matchingType = interventionTypes.find(t => 
-          t.name.toLowerCase().includes(preselectedInterventionName.toLowerCase()) ||
-          preselectedInterventionName.toLowerCase().includes(t.name.toLowerCase())
+        matchingType = interventionTypes.find(t =>
+          normalizeForMatch(t.name) === target ||
+          normalizeForMatch(t.name).includes(target) ||
+          target.includes(normalizeForMatch(t.name))
         );
       }
-      
+
+      // 3. Specific aliases fallback
+      if (!matchingType) {
+        if (target.includes('fotovoltaic') || target.includes('solari')) {
+          matchingType = interventionTypes.find(t => t.name.toLowerCase().includes('solar') || t.name.toLowerCase().includes('fotovoltaic'));
+        }
+        if (target.includes('pompa') || target.includes('calore')) {
+          matchingType = interventionTypes.find(t => t.name.toLowerCase().includes('pompa'));
+        }
+      }
+
       if (matchingType) {
         console.log('Auto-selecting intervention:', matchingType.name, 'from:', preselectedInterventionName);
         setSelectedIntervention(matchingType.id);
@@ -191,18 +211,18 @@ export function DirectSelectionFlow({ onComplete, onBack, preselectedInterventio
           Passo {step} di 2
         </div>
         <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-          <div 
+          <div
             className="h-full bg-secondary transition-all duration-300"
             style={{ width: `${(step / 2) * 100}%` }}
           />
         </div>
       </div>
-      
+
       {/* Show selected intervention badge when preselected */}
       {isPreselected && selectedInterventionName && (
         <div className="mb-4">
           <Badge variant="secondary" className="text-sm px-3 py-1">
-            {selectedInterventionName}
+            {preselectedInterventionName}
           </Badge>
         </div>
       )}
@@ -215,15 +235,14 @@ export function DirectSelectionFlow({ onComplete, onBack, preselectedInterventio
               Quale intervento vuoi effettuare?
             </p>
           </div>
-          
+
           <RadioGroup value={selectedIntervention} onValueChange={setSelectedIntervention}>
             <div className="grid gap-3">
               {interventionTypes.map((type) => (
-                <Card 
+                <Card
                   key={type.id}
-                  className={`p-4 cursor-pointer transition-all ${
-                    selectedIntervention === type.id ? "border-primary ring-2 ring-primary/20" : ""
-                  }`}
+                  className={`p-4 cursor-pointer transition-all ${selectedIntervention === type.id ? "border-primary ring-2 ring-primary/20" : ""
+                    }`}
                   onClick={() => setSelectedIntervention(type.id)}
                 >
                   <div className="flex items-start space-x-3">
@@ -256,10 +275,9 @@ export function DirectSelectionFlow({ onComplete, onBack, preselectedInterventio
           {partners.length > 0 ? (
             <RadioGroup value={selectedPartner} onValueChange={setSelectedPartner}>
               <div className="grid gap-3">
-                <Card 
-                  className={`p-4 cursor-pointer transition-all ${
-                    selectedPartner === "" ? "border-primary ring-2 ring-primary/20" : ""
-                  }`}
+                <Card
+                  className={`p-4 cursor-pointer transition-all ${selectedPartner === "" ? "border-primary ring-2 ring-primary/20" : ""
+                    }`}
                   onClick={() => setSelectedPartner("")}
                 >
                   <div className="flex items-start space-x-3">
@@ -274,11 +292,10 @@ export function DirectSelectionFlow({ onComplete, onBack, preselectedInterventio
                 </Card>
 
                 {partners.map((partner) => (
-                  <Card 
+                  <Card
                     key={partner.id}
-                    className={`p-4 cursor-pointer transition-all ${
-                      selectedPartner === partner.id ? "border-primary ring-2 ring-primary/20" : ""
-                    }`}
+                    className={`p-4 cursor-pointer transition-all ${selectedPartner === partner.id ? "border-primary ring-2 ring-primary/20" : ""
+                      }`}
                     onClick={() => setSelectedPartner(partner.id)}
                   >
                     <div className="flex items-start space-x-3">
@@ -333,7 +350,7 @@ export function DirectSelectionFlow({ onComplete, onBack, preselectedInterventio
           <ChevronLeft className="h-4 w-4 mr-2" />
           Indietro
         </Button>
-        
+
         {step === 1 ? (
           <Button onClick={handleNext} disabled={!selectedIntervention}>
             Avanti

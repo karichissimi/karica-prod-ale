@@ -27,8 +27,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased relative overflow-x-hidden selection:bg-[#45FF4A]/30 selection:text-[#203149]`}
       >
+        {/* Aurora Background Effects - Strict Palette */}
+        <div className="fixed top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-[#45FF4A]/20 blur-[100px] pointer-events-none z-[-1] animate-pulse-soft" />
+        <div className="fixed bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-[#0C86C7]/20 blur-[100px] pointer-events-none z-[-1] animate-pulse-soft" style={{ animationDelay: '1s' }} />
+
         <Providers>
           {children}
         </Providers>

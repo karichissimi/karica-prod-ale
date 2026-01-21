@@ -178,137 +178,150 @@ export default function UtilitiesPage() {
                     </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="electric" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    {!billData ? (
-                        <Card className="p-8 text-center space-y-6 border-dashed border-2">
-                            <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                                <FileText className="h-8 w-8 text-primary" />
-                            </div>
-                            <div className="space-y-2">
-                                <h3 className="text-xl font-semibold">Nessuna bolletta caricata</h3>
-                                <p className="text-muted-foreground max-w-sm mx-auto">
-                                    Carica la tua ultima bolletta luce per vedere l'analisi dei consumi e scoprire quanto puoi risparmiare.
-                                </p>
-                            </div>
-                            <Button size="lg" onClick={() => setBillDialogOpen(true)} className="gap-2">
-                                <Upload className="h-5 w-5" /> Carica Bolletta Luce
-                            </Button>
-                        </Card>
-                    ) : (
-                        <>
-                            <SupplyCard onUpdateBill={() => setBillDialogOpen(true)} />
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <Card className="p-4 bg-card/50">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 rounded-lg bg-primary/10">
-                                            <Calendar className="h-5 w-5 text-primary" />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-xs text-muted-foreground">Media Mensile</p>
-                                            <p className="text-xl font-bold">~<AnimatedStat end={avgMonthlyEur} decimals={0} suffix="€" /></p>
-                                        </div>
+                {loading ? (
+                    <div className="space-y-6 mt-6 animate-pulse">
+                        <div className="h-[200px] bg-muted/50 rounded-xl w-full"></div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="h-24 bg-muted/50 rounded-xl"></div>
+                            <div className="h-24 bg-muted/50 rounded-xl"></div>
+                        </div>
+                        <div className="h-[300px] bg-muted/50 rounded-xl w-full"></div>
+                    </div>
+                ) : (
+                    <>
+                        <TabsContent value="electric" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            {!billData ? (
+                                <Card className="p-8 text-center space-y-6 border-dashed border-2">
+                                    <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                                        <FileText className="h-8 w-8 text-primary" />
                                     </div>
-                                </Card>
-                                <Card className="p-4 bg-card/50" onClick={() => setAreraPopupOpen(true)}>
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 rounded-lg bg-accent/10">
-                                            <TrendingUp className="h-5 w-5 text-accent" />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-xs text-muted-foreground">Totale Annuo</p>
-                                            <p className="text-xl font-bold">~<AnimatedStat end={Math.round(billData.annual_consumption_projected! * priceKwh)} decimals={0} suffix="€" /></p>
-                                        </div>
+                                    <div className="space-y-2">
+                                        <h3 className="text-xl font-semibold">Nessuna bolletta caricata</h3>
+                                        <p className="text-muted-foreground max-w-sm mx-auto">
+                                            Carica la tua ultima bolletta luce per vedere l'analisi dei consumi e scoprire quanto puoi risparmiare.
+                                        </p>
                                     </div>
+                                    <Button size="lg" onClick={() => setBillDialogOpen(true)} className="gap-2">
+                                        <Upload className="h-5 w-5" /> Carica Bolletta Luce
+                                    </Button>
                                 </Card>
-                            </div>
+                            ) : (
+                                <>
+                                    <SupplyCard onUpdateBill={() => setBillDialogOpen(true)} />
 
-                            {/* Monthly Consumption Chart */}
-                            <CardWithWatermark className="p-6 glass-effect" watermarkPosition="bottom-right" watermarkSize="lg" watermarkOpacity={0.04}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="text-xl font-semibold">Consumi Mensili</h3>
-                                    {getProjectionBadge(true)}
-                                </div>
-                                <div className="h-[250px] w-full mt-4">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={monthlyData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }} onClick={(data: any) => {
-                                            if (data && data.activePayload) {
-                                                const clickedMonth = data.activePayload[0].payload.monthNum;
-                                                setSelectedMonth(selectedMonth === clickedMonth ? null : clickedMonth);
-                                            }
-                                        }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                                            <XAxis dataKey="mese" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '10px' }} tickLine={false} axisLine={false} />
-                                            <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '10px' }} tickLine={false} axisLine={false} tickFormatter={value => `${value}`} />
-                                            <ReferenceLine y={Math.round(ITALIAN_AVERAGE / 12)} stroke="hsl(var(--destructive) / 0.7)" strokeDasharray="5 3" strokeWidth={2} />
-                                            <Tooltip cursor={{ fill: 'hsl(var(--muted) / 0.3)' }} content={({ active, payload }) => {
-                                                if (!active || !payload?.[0]) return null;
-                                                const data = payload[0].payload as MonthData;
-                                                return (
-                                                    <div className="bg-card border rounded-lg p-3 shadow-lg">
-                                                        <p className="font-semibold">{MONTH_FULL_NAMES[data.monthNum - 1]}</p>
-                                                        <p className="text-lg font-bold text-primary">~{data.costoEur.toFixed(0)}€</p>
-                                                        <p className="text-sm text-muted-foreground">{data.consumo.toLocaleString()} kWh</p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Card className="p-4 bg-card/50">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 rounded-lg bg-primary/10">
+                                                    <Calendar className="h-5 w-5 text-primary" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs text-muted-foreground">Media Mensile</p>
+                                                    <p className="text-xl font-bold">~<AnimatedStat end={avgMonthlyEur} decimals={0} suffix="€" /></p>
+                                                </div>
+                                            </div>
+                                        </Card>
+                                        <Card className="p-4 bg-card/50" onClick={() => setAreraPopupOpen(true)}>
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 rounded-lg bg-accent/10">
+                                                    <TrendingUp className="h-5 w-5 text-accent" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs text-muted-foreground">Totale Annuo</p>
+                                                    <p className="text-xl font-bold">~<AnimatedStat end={Math.round(billData.annual_consumption_projected! * priceKwh)} decimals={0} suffix="€" /></p>
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    </div>
+
+                                    {/* Monthly Consumption Chart */}
+                                    <CardWithWatermark className="p-6 glass-effect" watermarkPosition="bottom-right" watermarkSize="lg" watermarkOpacity={0.04}>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h3 className="text-xl font-semibold">Consumi Mensili</h3>
+                                            {getProjectionBadge(true)}
+                                        </div>
+                                        <div className="h-[250px] w-full mt-4">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={monthlyData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }} onClick={(data: any) => {
+                                                    if (data && data.activePayload) {
+                                                        const clickedMonth = data.activePayload[0].payload.monthNum;
+                                                        setSelectedMonth(selectedMonth === clickedMonth ? null : clickedMonth);
+                                                    }
+                                                }}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                                                    <XAxis dataKey="mese" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '10px' }} tickLine={false} axisLine={false} />
+                                                    <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '10px' }} tickLine={false} axisLine={false} tickFormatter={value => `${value}`} />
+                                                    <ReferenceLine y={Math.round(ITALIAN_AVERAGE / 12)} stroke="hsl(var(--destructive) / 0.7)" strokeDasharray="5 3" strokeWidth={2} />
+                                                    <Tooltip cursor={{ fill: 'hsl(var(--muted) / 0.3)' }} content={({ active, payload }) => {
+                                                        if (!active || !payload?.[0]) return null;
+                                                        const data = payload[0].payload as MonthData;
+                                                        return (
+                                                            <div className="bg-card border rounded-lg p-3 shadow-lg">
+                                                                <p className="font-semibold">{MONTH_FULL_NAMES[data.monthNum - 1]}</p>
+                                                                <p className="text-lg font-bold text-primary">~{data.costoEur.toFixed(0)}€</p>
+                                                                <p className="text-sm text-muted-foreground">{data.consumo.toLocaleString()} kWh</p>
+                                                            </div>
+                                                        );
+                                                    }} />
+                                                    <Bar dataKey="consumo" radius={[4, 4, 0, 0]} cursor="pointer">
+                                                        {monthlyData.map((entry, index) => <Cell key={`cell-${index}`} fill={selectedMonth === entry.monthNum ? 'hsl(var(--primary))' : entry.isCurrent ? 'hsl(var(--primary) / 0.8)' : entry.isCovered ? 'hsl(var(--primary) / 0.5)' : 'hsl(var(--muted-foreground) / 0.3)'} />)}
+                                                    </Bar>
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+
+                                        {selectedMonthData && (
+                                            <div className="mt-4 p-4 bg-primary/5 rounded-lg border border-primary/20 animate-in fade-in zoom-in-95 duration-200">
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <p className="text-sm font-medium">{MONTH_FULL_NAMES[selectedMonthData.monthNum - 1]}</p>
+                                                        <p className="text-2xl font-bold text-primary">~{selectedMonthData.costoEur.toFixed(0)}€</p>
                                                     </div>
-                                                );
-                                            }} />
-                                            <Bar dataKey="consumo" radius={[4, 4, 0, 0]} cursor="pointer">
-                                                {monthlyData.map((entry, index) => <Cell key={`cell-${index}`} fill={selectedMonth === entry.monthNum ? 'hsl(var(--primary))' : entry.isCurrent ? 'hsl(var(--primary) / 0.8)' : entry.isCovered ? 'hsl(var(--primary) / 0.5)' : 'hsl(var(--muted-foreground) / 0.3)'} />)}
-                                            </Bar>
-                                        </BarChart>
-                                    </ResponsiveContainer>
+                                                    <div className="text-right">
+                                                        <p className="text-sm text-muted-foreground">{selectedMonthData.consumo} kWh</p>
+                                                        <Badge variant="outline" className="mt-1">{selectedMonthData.isCovered ? 'Reale' : 'Stimato'}</Badge>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </CardWithWatermark>
+                                </>
+                            )}
+                        </TabsContent>
+
+                        <TabsContent value="gas" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <Card className="p-8 text-center space-y-6 border-dashed border-2">
+                                <div className="mx-auto w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center">
+                                    <Flame className="h-8 w-8 text-orange-500" />
                                 </div>
+                                <div className="space-y-2">
+                                    <h3 className="text-xl font-semibold">Bolletta Gas</h3>
+                                    <p className="text-muted-foreground max-w-sm mx-auto">
+                                        La gestione delle bollette Gas è in arrivo! Presto potrai monitorare anche i tuoi consumi di gas e risparmiare.
+                                    </p>
+                                </div>
+                                <Button size="lg" disabled className="gap-2">
+                                    <Upload className="h-5 w-5" /> Carica Bolletta Gas (Presto)
+                                </Button>
+                            </Card>
 
-                                {selectedMonthData && (
-                                    <div className="mt-4 p-4 bg-primary/5 rounded-lg border border-primary/20 animate-in fade-in zoom-in-95 duration-200">
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <p className="text-sm font-medium">{MONTH_FULL_NAMES[selectedMonthData.monthNum - 1]}</p>
-                                                <p className="text-2xl font-bold text-primary">~{selectedMonthData.costoEur.toFixed(0)}€</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-sm text-muted-foreground">{selectedMonthData.consumo} kWh</p>
-                                                <Badge variant="outline" className="mt-1">{selectedMonthData.isCovered ? 'Reale' : 'Stimato'}</Badge>
-                                            </div>
-                                        </div>
+                            <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 rounded-xl bg-background shadow-sm">
+                                        <Info className="h-6 w-6 text-primary" />
                                     </div>
-                                )}
-                            </CardWithWatermark>
-                        </>
-                    )}
-                </TabsContent>
-
-                <TabsContent value="gas" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <Card className="p-8 text-center space-y-6 border-dashed border-2">
-                        <div className="mx-auto w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center">
-                            <Flame className="h-8 w-8 text-orange-500" />
-                        </div>
-                        <div className="space-y-2">
-                            <h3 className="text-xl font-semibold">Bolletta Gas</h3>
-                            <p className="text-muted-foreground max-w-sm mx-auto">
-                                La gestione delle bollette Gas è in arrivo! Presto potrai monitorare anche i tuoi consumi di gas e risparmiare.
-                            </p>
-                        </div>
-                        <Button size="lg" disabled className="gap-2">
-                            <Upload className="h-5 w-5" /> Carica Bolletta Gas (Presto)
-                        </Button>
-                    </Card>
-
-                    <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-                        <div className="flex items-start gap-4">
-                            <div className="p-3 rounded-xl bg-background shadow-sm">
-                                <Info className="h-6 w-6 text-primary" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-foreground mb-1">Consulenza Energetica</h3>
-                                <p className="text-sm text-muted-foreground mb-4">
-                                    La nostra missione è aiutarti a risparmiare su tutte le tue utenze. I nostri esperti stanno lavorando per integrarti le migliori offerte gas sul mercato.
-                                </p>
-                                <Button variant="outline" className="w-full sm:w-auto">Scopri di più</Button>
-                            </div>
-                        </div>
-                    </Card>
-                </TabsContent>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-foreground mb-1">Consulenza Energetica</h3>
+                                        <p className="text-sm text-muted-foreground mb-4">
+                                            La nostra missione è aiutarti a risparmiare su tutte le tue utenze. I nostri esperti stanno lavorando per integrarti le migliori offerte gas sul mercato.
+                                        </p>
+                                        <Button variant="outline" className="w-full sm:w-auto">Scopri di più</Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        </TabsContent>
+                    </>
+                )}
             </Tabs>
 
             <Dialog open={billDialogOpen} onOpenChange={setBillDialogOpen}>

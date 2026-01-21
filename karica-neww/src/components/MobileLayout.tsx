@@ -17,6 +17,8 @@ import { useScrollHeader } from "@/hooks/useScrollHeader";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
+import { useSwipe } from "@/hooks/use-swipe";
+import { usePathname } from "next/navigation";
 import karicaLogo from '@/assets/karica-logo-2a.png';
 
 // Search routes configuration
@@ -120,14 +122,39 @@ export function MobileLayout({ children, showSearch = true, onRefresh }: MobileL
 
   const handleRefresh = onRefresh || defaultRefresh;
 
+  /* Swipe Handlers */
+  const pathname = usePathname();
+  const MAIN_ROUTES = ['/', '/utilities', '/interventions', '/cer'];
+
+  const handleSwipeLeft = () => {
+    const currentIndex = MAIN_ROUTES.indexOf(pathname);
+    if (currentIndex !== -1 && currentIndex < MAIN_ROUTES.length - 1) {
+      navigate(MAIN_ROUTES[currentIndex + 1]);
+    }
+  };
+
+  const handleSwipeRight = () => {
+    const currentIndex = MAIN_ROUTES.indexOf(pathname);
+    if (currentIndex > 0) {
+      navigate(MAIN_ROUTES[currentIndex - 1]);
+    }
+  };
+
+  const swipeHandlers = useSwipe({
+    onSwipedLeft: handleSwipeLeft,
+    onSwipedRight: handleSwipeRight
+  });
+
   return (
-    <div className="flex flex-col h-[100dvh] animate-fade-in relative overflow-hidden">
+    <div
+      className="flex flex-col h-[100dvh] animate-fade-in relative overflow-hidden"
+    >
       <ParallaxBackground />
 
       {/* Smart Header - with safe area support for notch/status bar */}
       <header
         className={cn(
-          "sticky top-0 z-50 glass-premium border-b border-border/30 transition-all duration-300",
+          "sticky top-0 z-50 glass-strong border-b border-border/30 transition-all duration-300",
           isCollapsed && !isSearchExpanded ? "pb-1.5 pt-[max(0.375rem,env(safe-area-inset-top))]" : "pb-2.5 pt-[max(0.625rem,env(safe-area-inset-top))]",
           !isAtTop && "shadow-lg"
         )}
@@ -301,13 +328,12 @@ export function MobileLayout({ children, showSearch = true, onRefresh }: MobileL
         className="flex-1 overflow-y-auto overscroll-contain"
         data-scroll-container
         style={{ WebkitOverflowScrolling: 'touch' }}
+        {...swipeHandlers}
       >
         <PullToRefresh onRefresh={handleRefresh} className="min-h-full">
-          <PageTransition>
-            <main className="p-3 pb-20">
-              {children}
-            </main>
-          </PageTransition>
+          <main className="p-3 pb-20 animate-in fade-in duration-300">
+            {children}
+          </main>
         </PullToRefresh>
       </div>
 

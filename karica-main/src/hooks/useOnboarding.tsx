@@ -54,13 +54,13 @@ export const useOnboarding = () => {
   const [loading, setLoading] = useState(false);
   const [billFilePath, setBillFilePath] = useState<string>('');
   const [analysisComplete, setAnalysisComplete] = useState(false);
-  
+
   // Store the original file for preview
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  
+
   // New full bill analysis data
   const [billAnalysis, setBillAnalysis] = useState<BillAnalysisData | null>(null);
-  
+
   // Legacy billData for backward compatibility
   const [billData, setBillData] = useState<BillData>({
     pod: '',
@@ -78,7 +78,7 @@ export const useOnboarding = () => {
     setAnalysisComplete(false);
     setUploadedFile(file); // Store original file for preview
     setCurrentStep(2); // Show game/loading state
-    
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -86,23 +86,23 @@ export const useOnboarding = () => {
       }
 
       console.log('Preparing file for upload...', file.name, file.type, file.size);
-      
+
       // Convert file to base64 for better mobile compatibility
       const arrayBuffer = await file.arrayBuffer();
       const base64 = btoa(
         new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
       );
-      
+
       const payload = {
         fileName: file.name,
         fileType: file.type,
         fileData: base64
       };
-      
+
       console.log('Calling analyze-bill edge function with JSON payload...');
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-bill`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analisi-bolletta-luce`,
         {
           method: 'POST',
           headers: {
@@ -132,21 +132,21 @@ export const useOnboarding = () => {
       if (data?.data) {
         // Store full analysis data
         setBillAnalysis(data.data);
-        
+
         // Also update legacy billData for compatibility
-        const annualConsumption = data.data.annual_consumption_projected || 
-                                   data.data.annual_consumption || 0;
+        const annualConsumption = data.data.annual_consumption_projected ||
+          data.data.annual_consumption || 0;
         setBillData({
           pod: data.data.pod || '',
           supplier: data.data.supplier || '',
           annualConsumption,
         });
-        
+
         // Store file path for preview
         if (data.file_path) {
           setBillFilePath(data.file_path);
         }
-        
+
         // Mark analysis as complete but DON'T change step
         // User will click button in game to proceed
         setAnalysisComplete(true);
@@ -166,7 +166,7 @@ export const useOnboarding = () => {
       throw error;
     }
   };
-  
+
   // Called when user clicks "Vedi Risultati" in game
   const proceedFromGame = () => {
     if (analysisComplete && billAnalysis) {
@@ -250,7 +250,7 @@ export const useOnboarding = () => {
   // Update bill analysis with confirmed/edited data
   const updateBillAnalysis = (data: Partial<BillAnalysisData>) => {
     setBillAnalysis(prev => prev ? { ...prev, ...data } : data as BillAnalysisData);
-    
+
     // Also update legacy billData
     if (data.pod !== undefined || data.supplier !== undefined || data.annual_consumption_projected !== undefined) {
       setBillData(prev => ({

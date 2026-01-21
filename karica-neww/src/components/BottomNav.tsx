@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { title: "Karica", url: "/", icon: null, isCustom: true },
   { title: "CER", url: "/cer", icon: Users, iconActive: Users },
-  { title: "Interventi", url: "/interventions", icon: Wrench, iconActive: Wrench },
-  { title: "Utenze", url: "/utilities", icon: Zap, iconActive: Zap },
+  { title: "Upgrade", url: "/interventions", icon: Wrench, iconActive: Wrench },
+  { title: "Consumi", url: "/utilities", icon: Zap, iconActive: Zap },
   { title: "Shop", url: "/marketplace", icon: ShoppingCart, iconActive: ShoppingCart },
 ];
 
@@ -62,7 +62,7 @@ export function BottomNav() {
   }, [activeIndex]);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border/30 pb-[env(safe-area-inset-bottom,0px)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 glass-strong pb-[env(safe-area-inset-bottom,0px)]">
       {/* Animated indicator */}
       <div
         className="absolute top-0 h-0.5 bg-gradient-primary rounded-full transition-all duration-300 ease-out"

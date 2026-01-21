@@ -27,10 +27,10 @@ const ARERA_PROFILE: Record<number, number> = {
 function getMonthsCovered(periodStart: string, periodEnd: string): number[] {
   const startDate = new Date(periodStart);
   const endDate = new Date(periodEnd);
-  
+
   const monthsCovered: number[] = [];
   const currentDate = new Date(startDate);
-  
+
   while (currentDate <= endDate) {
     const month = currentDate.getMonth() + 1; // 1-12
     if (!monthsCovered.includes(month)) {
@@ -38,13 +38,13 @@ function getMonthsCovered(periodStart: string, periodEnd: string): number[] {
     }
     currentDate.setMonth(currentDate.getMonth() + 1);
   }
-  
+
   // Se abbiamo un solo mese parziale
   if (monthsCovered.length === 0) {
     const month = startDate.getMonth() + 1;
     monthsCovered.push(month);
   }
-  
+
   return monthsCovered;
 }
 
@@ -87,21 +87,21 @@ function calculateAnnualConsumption(
   annualPeriodStart: string | null,
   annualPeriodEnd: string | null
 ): AnnualCalculationResult | null {
-  
+
   console.log('=== ANNUAL CALCULATION INPUT ===');
   console.log('Period consumption:', periodConsumption);
   console.log('Period:', periodStart, '-', periodEnd);
   console.log('Annual reported:', annualConsumptionReported);
   console.log('Annual period:', annualPeriodStart, '-', annualPeriodEnd);
-  
+
   // CASO 1: Consumo annuo storico completo (12 mesi)
   if (annualConsumptionReported && annualPeriodStart && annualPeriodEnd) {
     const coveredMonths = getMonthsCovered(annualPeriodStart, annualPeriodEnd);
-    
+
     if (coveredMonths.length >= 12) {
       console.log('=== CASE 1: HISTORICAL COMPLETE ===');
       console.log('Using reported annual consumption directly:', annualConsumptionReported);
-      
+
       return {
         annualProjection: Math.round(annualConsumptionReported),
         method: 'historical_complete',
@@ -115,18 +115,18 @@ function calculateAnnualConsumption(
         }
       };
     }
-    
+
     // CASO 2: Consumo annuo storico parziale (6-11 mesi)
     if (coveredMonths.length >= 6) {
       console.log('=== CASE 2: HISTORICAL PARTIAL ===');
       console.log('Covered months:', coveredMonths.length);
-      
+
       const missingMonths = getMissingMonths(annualPeriodStart, annualPeriodEnd);
       const coveredWeight = getAreraWeight(coveredMonths);
-      
+
       // Media mensile ponderata dal consumo noto
       const avgMonthlyConsumption = annualConsumptionReported / coveredMonths.length;
-      
+
       // Proiezione per i mesi mancanti usando ARERA
       let projectedAddition = 0;
       missingMonths.forEach(month => {
@@ -134,13 +134,13 @@ function calculateAnnualConsumption(
         const monthEstimate = avgMonthlyConsumption * (ARERA_PROFILE[month] / avgCoveredWeight);
         projectedAddition += monthEstimate;
       });
-      
+
       const annualProjection = Math.round(annualConsumptionReported + projectedAddition);
-      
+
       console.log('Missing months:', missingMonths);
       console.log('Projected addition:', projectedAddition);
       console.log('Final annual projection:', annualProjection);
-      
+
       return {
         annualProjection,
         method: 'historical_partial',
@@ -156,21 +156,21 @@ function calculateAnnualConsumption(
       };
     }
   }
-  
+
   // CASO 3: Solo consumo di periodo → proiezione ARERA completa
   if (periodConsumption && periodStart && periodEnd) {
     console.log('=== CASE 3: ARERA PROJECTION ===');
-    
+
     const monthsCovered = getMonthsCovered(periodStart, periodEnd);
     const totalWeight = getAreraWeight(monthsCovered);
-    
+
     const annualProjection = Math.round(periodConsumption / totalWeight);
     const missingMonths = getMissingMonths(periodStart, periodEnd);
-    
+
     console.log('Months covered:', monthsCovered);
     console.log('Total ARERA weight:', (totalWeight * 100).toFixed(1) + '%');
     console.log('Annual projection:', annualProjection, 'kWh/year');
-    
+
     return {
       annualProjection,
       method: 'arera_projection',
@@ -183,7 +183,7 @@ function calculateAnnualConsumption(
       }
     };
   }
-  
+
   // CASO 4: Fallback - solo consumo senza date
   if (periodConsumption) {
     console.log('=== CASE 4: DIRECT FALLBACK ===');
@@ -192,29 +192,31 @@ function calculateAnnualConsumption(
       method: 'direct',
       monthsCovered: [],
       monthsProjected: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-      totalWeight: 1/12,
+      totalWeight: 1 / 12,
       confidence: 'bassa',
       details: {
         arera_profile: ARERA_PROFILE
       }
     };
   }
-  
+
   return null;
 }
 
 serve(async (req) => {
+  console.log('Request Received:', req.method, req.url);
+
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!LOVABLE_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error('Missing required environment variables');
+    if (!GEMINI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Missing required environment variables (GEMINI_API_KEY, SUPABASE_URL, or SUPABASE_SERVICE_ROLE_KEY)');
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -231,7 +233,7 @@ serve(async (req) => {
     // Verify user
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    
+
     if (userError || !user) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -246,22 +248,22 @@ serve(async (req) => {
 
     // Check content type to determine how to parse the request
     const contentType = req.headers.get('content-type') || '';
-    
+
     if (contentType.includes('application/json')) {
       // Handle JSON payload (mobile-friendly approach)
       const jsonBody = await req.json();
-      
+
       if (!jsonBody.fileData || !jsonBody.fileName || !jsonBody.fileType) {
         return new Response(
           JSON.stringify({ error: 'Missing file data in JSON payload' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      
+
       fileName = jsonBody.fileName;
       fileType = jsonBody.fileType;
       base64 = jsonBody.fileData;
-      
+
       // Convert base64 back to ArrayBuffer for storage
       const binaryString = atob(base64);
       const bytes = new Uint8Array(binaryString.length);
@@ -269,7 +271,7 @@ serve(async (req) => {
         bytes[i] = binaryString.charCodeAt(i);
       }
       arrayBuffer = bytes.buffer;
-      
+
       console.log('=== ANALYZE BILL START (JSON) ===');
       console.log('User ID:', user.id);
       console.log('File details:', { name: fileName, type: fileType, size: arrayBuffer.byteLength });
@@ -277,7 +279,7 @@ serve(async (req) => {
       // Handle FormData (original approach for desktop)
       const formData = await req.formData();
       const file = formData.get('file') as File;
-      
+
       if (!file) {
         return new Response(
           JSON.stringify({ error: 'No file provided' }),
@@ -292,10 +294,10 @@ serve(async (req) => {
       fileName = file.name;
       fileType = file.type;
       arrayBuffer = await file.arrayBuffer();
-      
+
       // Convert file to base64 for AI analysis - safely handle large files
       const bytes = new Uint8Array(arrayBuffer);
-      
+
       // Convert to base64 in chunks to avoid stack overflow
       base64 = '';
       const chunkSize = 8192;
@@ -324,90 +326,60 @@ serve(async (req) => {
 
     // Check if file is PDF or image
     const isPdf = fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
-    
+
     console.log('File converted to base64, length:', base64.length);
     console.log('File type:', fileType, 'isPdf:', isPdf);
-    
+
     // For PDFs, Gemini can analyze them directly via base64
     // For images, we use the image_url format
-    const contentForAI = isPdf 
+    const contentForAI = isPdf
       ? {
-          type: 'image_url',
-          image_url: {
-            url: `data:application/pdf;base64,${base64}`
-          }
+        type: 'image_url',
+        image_url: {
+          url: `data:application/pdf;base64,${base64}`
         }
+      }
       : {
-          type: 'image_url',
-          image_url: {
-            url: `data:${fileType};base64,${base64}`
-          }
-        };
+        type: 'image_url',
+        image_url: {
+          url: `data:${fileType};base64,${base64}`
+        }
+      };
 
-    // Enhanced AI prompt for Italian energy bills with period extraction AND annual data
-    const systemPrompt = `Sei un assistente esperto nell'analisi di bollette energetiche italiane.
-Il tuo compito è estrarre con precisione queste informazioni dalla bolletta:
+    const systemPrompt = `Sei un Senior Energy Data Scientist esperto in analisi bollette italiane.
+Il tuo obiettivo è costruire un profilo energetico preciso per un audit di risparmio.
 
-1. **PERIODO DI FATTURAZIONE CORRENTE** (OBBLIGATORIO):
-   - Data inizio periodo fatturato (format: YYYY-MM-DD)
-   - Data fine periodo fatturato (format: YYYY-MM-DD)
-   - Cerca "Periodo di riferimento", "Periodo fatturazione", "Dal... al...", "Periodo dal"
+ISTRUZIONI DI RAGIONAMENTO (Esegui mentalmente prima di estrarre):
+1.  **Analisi Strutturale:**
+    - Non fermarti alla prima pagina (Syntesi). Cerca tabelle di dettaglio ("Quadro Letture", "Dettaglio Consumi", "Scontrino").
+    - Se vedi un grafico a barre, usalo per stimare il consumo annuo se il dato testuale manca.
 
-2. **CONSUMO DEL PERIODO FATTURATO** (OBBLIGATORIO):
-   - Consumo in kWh relativo SOLO al periodo fatturato corrente
-   - Cerca "Consumi fatturati", "kWh consumati", "Energia attiva", "Totale consumi periodo"
+2.  **Disambiguazione Variabili (CRITICO):**
+    - **CONSUMO (kWh/Smc):** È la quantità di energia. Si misura in kWh (luce) o Smc (gas).
+    - **COSTO (€):** È quanto si paga. NON usarlo per il "Consumo".
+    - *Esempio Octopus:* Spesso mostra "Totale €" in grande e "kWh" in piccolo. Tu devi cercare i kWh.
 
-3. **CONSUMO ANNUO STORICO** (SE PRESENTE):
-   - Molte bollette riportano il consumo degli ultimi 12 mesi
-   - Cerca "Consumo annuo", "Consumi ultimi 12 mesi", "Consumo annuo stimato", "Totale annuo"
-   - Estrai anche il periodo coperto (es. "dal 01/12/2024 al 30/11/2025")
+3.  **Logica di Estrazione:**
+    - **Periodo Corrente:** Cerca date esplicite associate a "Periodo di fatturazione" o "Dal... Al...".
+    - **Consumo Periodo:** Somma F1 + F2 + F3 (Energia Attiva). Ignora "Energia Reattiva".
+    - **Consumo Annuo:** Cerca "Consumo Annuo", "Consumo Storico" o "I tuoi consumi ult. 12 mesi".
+      - *Check:* Se Consumo Annuo ≈ Consumo Periodo, è un errore (a meno che la bolletta non sia un conguaglio annuale).
 
-4. **POD (Punto di Prelievo)**: 
-   - Codice alfanumerico di 14-15 caratteri che inizia con "IT"
-   - Formato tipico: IT001E12345678 o IT001E1234567X
-   - Cerca vicino a "Punto di Prelievo", "POD", "Codice POD"
-
-5. **Fornitore Energetico**:
-   - Nome dell'azienda che emette la bolletta
-   - Fornitori comuni italiani: Enel Energia, Eni Plenitude, A2A Energia, Edison, Sorgenia, Illumia, Axpo, Engie, Hera, Iren, E.ON, Wekiwi, Plenitude, Octopus Energy
-
-6. **Tipo di Tariffa/Contratto**:
-   - "monorario" = tariffa unica tutto il giorno
-   - "biorario" = tariffa F1/F23 (fascia luce)
-   - "triorario" = tariffa F1/F2/F3 (tre fasce)
-
-7. **Potenza Impegnata (kW)**:
-   - Valori tipici: 3, 3.3, 4.5, 6 kW per residenziale
-
-8. **Codice Cliente**:
-   - Codice numerico identificativo del cliente
-
-9. **Prezzo kWh (€/kWh)**:
-   - Prezzo unitario dell'energia
-
-Rispondi ESCLUSIVAMENTE in formato JSON valido:
+FORMATO OUTPUT (JSON STRICT):
 {
-  "period_start": "YYYY-MM-DD o null",
-  "period_end": "YYYY-MM-DD o null",
-  "period_consumption": numero in kWh o null,
-  "annual_consumption_reported": numero in kWh o null (consumo annuo storico se presente),
-  "annual_period_start": "YYYY-MM-DD o null (inizio periodo consumo annuo)",
-  "annual_period_end": "YYYY-MM-DD o null (fine periodo consumo annuo)",
-  "pod": "codice POD o null",
-  "supplier": "nome fornitore o null", 
-  "tariff_type": "monorario" | "biorario" | "triorario" | null,
-  "power_kw": numero decimale o null,
-  "customer_code": "codice cliente o null",
-  "price_kwh": numero decimale o null
-}
-
-REGOLE CRITICHE:
-- period_consumption è il consumo DEL PERIODO fatturato corrente, NON il consumo annuo
-- annual_consumption_reported è il consumo annuo storico SE PRESENTE in bolletta (ultimi 12 mesi)
-- Cerca attentamente le date del periodo di riferimento
-- Per le date usa formato ISO YYYY-MM-DD
-- Per i numeri, restituisci solo valori numerici senza unità (es. 1987.63 non "1987,63 kWh")
-- Non aggiungere commenti, spiegazioni o markdown`;
+  "_reasoning": "Spiegazione BREVE (max 10 parole) di dove hai trovato i dati.",
+  "period_start": "YYYY-MM-DD",
+  "period_end": "YYYY-MM-DD",
+  "period_consumption": numero (kWh),
+  "annual_consumption_reported": numero (kWh) o null,
+  "annual_period_start": "YYYY-MM-DD" o null,
+  "annual_period_end": "YYYY-MM-DD" o null,
+  "pod": "IT...",
+  "supplier": "nome fornitore",
+  "tariff_type": "monorario/biorario/triorario",
+  "power_kw": numero,
+  "customer_code": "string"
+}`;
 
     // For both PDF and images, we send the file directly to Gemini which can process both
     const userMessage = [
@@ -422,52 +394,63 @@ REGOLE CRITICHE:
     console.log('Model: google/gemini-2.5-flash');
 
     // Analyze with AI
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Analyze with AI
+    let aiData;
+
+    // Use Google Gemini Direct API
+    console.log('Using Google Gemini Direct API with gemini-2.5-flash');
+
+    // Note: We already checked for GEMINI_API_KEY at the start
+
+    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: userMessage
-          }
-        ],
-        max_tokens: 600,
-        temperature: 0.1
+        contents: [{
+          parts: [
+            { text: systemPrompt + "\n\n" + 'Analizza questa bolletta energetica italiana. IMPORTANTE: Estrai il CONSUMO DEL PERIODO fatturato (non annuo) e le DATE ESATTE del periodo di riferimento. Cerca attentamente "Periodo di riferimento", "Dal... al...", "Consumi fatturati".' },
+            {
+              inline_data: {
+                mime_type: fileType,
+                data: base64
+              }
+            }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+          responseMimeType: "application/json"
+        }
       }),
     });
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'Troppi tentativi. Riprova tra qualche minuto.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'Crediti AI esauriti. Contatta il supporto.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      throw new Error(`AI API error: ${aiResponse.status} ${errorText}`);
+      console.error('Gemini API error:', aiResponse.status, errorText);
+      throw new Error(`Gemini API error: ${aiResponse.status} ${errorText}`);
     }
 
-    const aiData = await aiResponse.json();
-    console.log('=== AI RAW RESPONSE ===');
+    const googleData = await aiResponse.json();
+    console.log('=== GEMINI RAW RESPONSE ===');
+    console.log(JSON.stringify(googleData, null, 2));
+
+    // Normalize to match OpenAI format expected by downstream code
+    if (googleData.candidates && googleData.candidates[0] && googleData.candidates[0].content) {
+      aiData = {
+        choices: [{
+          message: {
+            content: googleData.candidates[0].content.parts[0].text
+          }
+        }]
+      };
+    } else {
+      throw new Error('Unexpected Gemini response format');
+    }
+
+    console.log('=== NORMALIZED AI RESPONSE ===');
     console.log(JSON.stringify(aiData, null, 2));
 
     interface ExtractedBillData {
@@ -497,8 +480,8 @@ REGOLE CRITICHE:
       customer_code: string | null;
       price_kwh: number | null;
     }
-    
-    let extractedData: ExtractedBillData = { 
+
+    let extractedData: ExtractedBillData = {
       period_start: null,
       period_end: null,
       period_consumption: null,
@@ -508,51 +491,72 @@ REGOLE CRITICHE:
       annual_consumption_projected: null,
       projection_method: null,
       projection_details: null,
-      pod: null, 
+      pod: null,
       supplier: null,
       tariff_type: null,
       power_kw: null,
       customer_code: null,
       price_kwh: null
     };
-    
+
+    let debugReasoning: string | null = null;
+
     try {
       const content = aiData.choices[0].message.content;
       console.log('=== AI CONTENT ===');
       console.log(content);
-      
-      // Remove markdown code blocks if present
-      let jsonContent = content
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim();
-      
+
+      // Robust JSON extraction: Find first '{' and last '}'
+      const firstBrace = content.indexOf('{');
+      const lastBrace = content.lastIndexOf('}');
+
+      let jsonContent = content;
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        jsonContent = content.substring(firstBrace, lastBrace + 1);
+      } else {
+        // Fallback cleanup if no braces found (unlikely for valid JSON)
+        jsonContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      }
+
       console.log('=== CLEANED JSON ===');
       console.log(jsonContent);
-      
+
       const parsed = JSON.parse(jsonContent);
-      
-      // Validate period dates
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (parsed.period_start && dateRegex.test(parsed.period_start)) {
-        extractedData.period_start = parsed.period_start;
-      }
-      if (parsed.period_end && dateRegex.test(parsed.period_end)) {
-        extractedData.period_end = parsed.period_end;
-      }
-      
+
+      // Capture reasoning for debug
+      debugReasoning = parsed._reasoning || "No reasoning provided in JSON";
+      console.log('AI Reasoning:', debugReasoning);
+
+      // Helper for flexible date parsing
+      const normalizeDate = (dateStr: string): string | null => {
+        if (!dateStr) return null;
+        // Try YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+        // Try DD/MM/YYYY or DD-MM-YYYY
+        const matchEU = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if (matchEU) {
+          return `${matchEU[3]}-${matchEU[2].padStart(2, '0')}-${matchEU[1].padStart(2, '0')}`;
+        }
+        return null;
+      };
+
+      // Validate and Normalize Dates
+      if (parsed.period_start) extractedData.period_start = normalizeDate(parsed.period_start);
+      if (parsed.period_end) extractedData.period_end = normalizeDate(parsed.period_end);
+
       // Validate period consumption
       if (parsed.period_consumption !== null && parsed.period_consumption !== undefined) {
         let consumption = parsed.period_consumption;
         if (typeof consumption === 'string') {
+          // Removes likely thousands separators (.) if followed by 3 digits, replaces decimal comma
           consumption = consumption.replace(/\./g, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
           consumption = parseFloat(consumption);
         }
-        if (!isNaN(consumption) && consumption > 0 && consumption < 50000) {
+        if (!isNaN(consumption)) {
           extractedData.period_consumption = Math.round(consumption);
         }
       }
-      
+
       // NEW: Validate annual consumption reported from bill
       if (parsed.annual_consumption_reported !== null && parsed.annual_consumption_reported !== undefined) {
         let annualConsumption = parsed.annual_consumption_reported;
@@ -560,19 +564,15 @@ REGOLE CRITICHE:
           annualConsumption = annualConsumption.replace(/\./g, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
           annualConsumption = parseFloat(annualConsumption);
         }
-        if (!isNaN(annualConsumption) && annualConsumption > 0 && annualConsumption < 100000) {
+        if (!isNaN(annualConsumption)) {
           extractedData.annual_consumption_reported = Math.round(annualConsumption * 100) / 100;
         }
       }
-      
+
       // NEW: Validate annual period dates
-      if (parsed.annual_period_start && dateRegex.test(parsed.annual_period_start)) {
-        extractedData.annual_period_start = parsed.annual_period_start;
-      }
-      if (parsed.annual_period_end && dateRegex.test(parsed.annual_period_end)) {
-        extractedData.annual_period_end = parsed.annual_period_end;
-      }
-      
+      if (parsed.annual_period_start) extractedData.annual_period_start = normalizeDate(parsed.annual_period_start);
+      if (parsed.annual_period_end) extractedData.annual_period_end = normalizeDate(parsed.annual_period_end);
+
       // Calculate annual projection using 3-level logic
       const calculationResult = calculateAnnualConsumption(
         extractedData.period_consumption,
@@ -582,7 +582,7 @@ REGOLE CRITICHE:
         extractedData.annual_period_start,
         extractedData.annual_period_end
       );
-      
+
       if (calculationResult) {
         extractedData.annual_consumption_projected = calculationResult.annualProjection;
         extractedData.projection_method = calculationResult.method;
@@ -596,29 +596,29 @@ REGOLE CRITICHE:
           arera_profile: calculationResult.details.arera_profile
         };
       }
-      
+
       // Validate and normalize POD
       if (parsed.pod) {
         const podClean = parsed.pod.toString().replace(/\s/g, '').toUpperCase();
-        // POD italiano deve iniziare con IT e avere 14-15 caratteri
-        if (podClean.startsWith('IT') && podClean.length >= 14 && podClean.length <= 15) {
+        // Relaxed POD check: Must contain IT and be at least 10 chars
+        if (podClean.includes('IT') && podClean.length >= 10) {
           extractedData.pod = podClean;
         } else {
           console.log('Invalid POD format, discarding:', podClean);
         }
       }
-      
+
       // Validate supplier
       if (parsed.supplier && typeof parsed.supplier === 'string' && parsed.supplier.length > 1) {
         extractedData.supplier = parsed.supplier.trim();
       }
-      
+
       // Validate tariff type
       const validTariffs = ['monorario', 'biorario', 'triorario'];
       if (parsed.tariff_type && validTariffs.includes(parsed.tariff_type.toLowerCase())) {
         extractedData.tariff_type = parsed.tariff_type.toLowerCase() as 'monorario' | 'biorario' | 'triorario';
       }
-      
+
       // Validate power
       if (parsed.power_kw !== null && parsed.power_kw !== undefined) {
         let power = parsed.power_kw;
@@ -630,12 +630,12 @@ REGOLE CRITICHE:
           extractedData.power_kw = Math.round(power * 10) / 10; // Round to 1 decimal
         }
       }
-      
+
       // Validate customer code
       if (parsed.customer_code && typeof parsed.customer_code === 'string' && parsed.customer_code.length >= 3) {
         extractedData.customer_code = parsed.customer_code.trim();
       }
-      
+
       // Validate price per kWh
       if (parsed.price_kwh !== null && parsed.price_kwh !== undefined) {
         let price = parsed.price_kwh;
@@ -647,13 +647,15 @@ REGOLE CRITICHE:
           extractedData.price_kwh = Math.round(price * 1000) / 1000; // Round to 3 decimals
         }
       }
-      
+
       console.log('=== EXTRACTED DATA ===');
       console.log(JSON.stringify(extractedData, null, 2));
-      
+
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
-      console.error('Raw content that failed to parse:', aiData.choices?.[0]?.message?.content);
+      const rawContent = aiData?.choices?.[0]?.message?.content || "No content";
+      debugReasoning = `⚠️ PARSING ERROR: ${parseError}\n\nRAW RESPONSE:\n${rawContent.slice(0, 500)}...`;
+      console.error('Raw content that failed to parse:', rawContent);
     }
 
     // Save to bill_uploads
@@ -674,7 +676,7 @@ REGOLE CRITICHE:
     const profileUpdate: Record<string, unknown> = {
       updated_at: new Date().toISOString()
     };
-    
+
     if (extractedData.pod) {
       profileUpdate.pod = extractedData.pod;
     }
@@ -705,6 +707,7 @@ REGOLE CRITICHE:
       JSON.stringify({
         success: true,
         data: extractedData,
+        debug_reasoning: debugReasoning, // Return reasoning to frontend
         file_path: fileName,
         isPdf
       }),
@@ -715,10 +718,11 @@ REGOLE CRITICHE:
     );
 
   } catch (error) {
-    console.error('Error in analyze-bill function:', error);
+    console.error('CRITICAL UNHANDLED ERROR:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      JSON.stringify({
+        error: error instanceof Error ? error.message : 'Critical system error',
+        details: String(error)
       }),
       {
         status: 500,

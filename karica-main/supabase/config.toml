@@ -1,6 +1,9 @@
 project_id = "aaiehsxiodbmwhykqqcn"
 
-[functions.analyze-bill]
+[functions.analisi-bolletta-luce]
+verify_jwt = true
+
+[functions.analisi-bolletta-gas]
 verify_jwt = true
 
 [functions.snap-solve]

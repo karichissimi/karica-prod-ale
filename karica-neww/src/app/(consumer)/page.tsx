@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
-import { Zap, Users, Award, FileText, Upload, Info, TrendingUp, ChevronRight, CheckCircle2, Flame, Wrench } from "lucide-react";
+import { Zap, Users, Award, Upload, Info, Flame, Wrench, ArrowRight, Sparkles, Leaf, TrendingDown, Calendar } from "lucide-react";
 import { AnimatedStat, ScrollReveal } from "@/components/ui/animated-stat";
+import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AnimatePresence, motion } from "framer-motion";
@@ -15,11 +16,18 @@ import { useOnboarding } from "@/hooks/useOnboarding";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
+import { AnalyzingLoader } from "@/components/onboarding/AnalyzingLoader";
+
+import { NumberTicker } from "@/components/ui/number-ticker";
+import { useHaptic } from "@/hooks/use-haptic";
+import { Sparkline } from "@/components/ui/sparkline";
+import { HeroIcon } from "@/components/ui/hero-icon";
 
 export default function Index() {
     const router = useRouter();
     const navigate = (path: string) => router.push(path);
     const { user } = useAuth();
+    const { triggerHaptic } = useHaptic();
 
     // Dialog states
     const [billDialogOpen, setBillDialogOpen] = useState(false);
@@ -27,8 +35,9 @@ export default function Index() {
 
     // Data states
     const [hasElectricBill, setHasElectricBill] = useState(false);
-    const [points, setPoints] = useState(0);
+    const [points, setPoints] = useState(13); // Hardcoded to 13 as requested
     const [userName, setUserName] = useState<string>("Utente");
+    const [lastBillData, setLastBillData] = useState<any>(null);
 
     const {
         uploadAndAnalyzeBill,
@@ -58,19 +67,23 @@ export default function Index() {
                     setUserName(firstName);
                 }
 
-                // Check if user has uploaded any bill
-                const { count, error } = await supabase
+                // Check if user has uploaded any bill and get the latest
+                const { data: bills, error } = await supabase
                     .from('bill_uploads')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('user_id', user.id);
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
 
-                if (!error) {
-                    setHasElectricBill(count !== null && count > 0);
+                if (!error && bills && bills.length > 0) {
+                    setHasElectricBill(true);
+                    // Extract basic info from ocr_data if available
+                    // This assumes ocr_data structure, adjusting based on valid data
+                    const bill = bills[0];
+                    if (bill.ocr_data) {
+                        setLastBillData(bill.ocr_data);
+                    }
                 }
-
-                // Placeholder for points (mock for now or fetch from profile if added)
-                // const { data: profile } = ...
-                setPoints(0);
 
             } catch (err) {
                 console.error('Error loading dashboard data:', err);
@@ -82,196 +95,208 @@ export default function Index() {
     }, [user]);
 
     const handleBillUpload = async (file: File) => {
-        // Just start the process, the hook manages step 2 which shows the game
+        triggerHaptic('success');
         await uploadAndAnalyzeBill(file);
-        // We don't close dialog immediately, we wait for game to finish
     };
 
     const handleGameComplete = () => {
-        proceedFromGame(); // Move to step 3
-        setBillDialogOpen(false); // Close dialog
-        window.location.reload(); // Refresh dashboard
+        proceedFromGame();
+        setBillDialogOpen(false);
+        window.location.reload();
     };
 
     return (
-        <div className="space-y-6 pb-20">
-            <WipDisclaimer storageKey="karica_wip_dismissed_home_v2" />
+        <div className="space-y-6 pb-24">
+            <WipDisclaimer storageKey="karica_wip_dismissed_home_v3" />
 
-            {/* Fullscreen Game/Loader when analyzing */}
-            <AnimatePresence>
-                {currentStep === 2 && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[60]"
-                    >
-                        <AnalyzingLoader
-                            isAnalysisComplete={analysisComplete}
-                            onAnalysisComplete={handleGameComplete}
-                        />
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Header Section */}
-            <ScrollReveal>
-                <div className="flex items-center gap-4">
-                    <AnimatedLogo className="h-14 w-14" />
-                    <div>
-                        <h2 className="text-3xl font-thin text-foreground">
-                            Ciao, <span className="font-brand font-normal text-primary">{userName}</span>
-                        </h2>
-                        <p className="text-muted-foreground text-sm">
-                            Ecco il riepilogo della tua energia
-                        </p>
+            {/* Loading Skeleton */}
+            {loading && (
+                <div className="space-y-4 animate-pulse max-w-7xl mx-auto">
+                    <div className="h-40 bg-muted/50 rounded-xl w-full mb-6"></div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="h-64 bg-muted/50 rounded-xl md:col-span-2 md:row-span-2"></div>
+                        <div className="h-32 bg-muted/50 rounded-xl"></div>
+                        <div className="h-32 bg-muted/50 rounded-xl"></div>
+                        <div className="h-32 bg-muted/50 rounded-xl"></div>
+                        <div className="h-32 bg-muted/50 rounded-xl"></div>
                     </div>
                 </div>
-            </ScrollReveal>
+            )}
 
-            {/* Utilities Status Cards */}
-            <div className="grid grid-cols-2 gap-3">
-                <ScrollReveal delay={100}>
-                    <Card
-                        className={`p-4 border-l-4 cursor-pointer hover:shadow-md transition-all ${hasElectricBill ? 'border-l-primary' : 'border-l-muted'}`}
-                        onClick={() => navigate('/utilities')}
-                    >
-                        <div className="flex justify-between items-start mb-2">
-                            <div className="p-2 rounded-full bg-primary/10">
-                                <Zap className="h-5 w-5 text-primary" />
-                            </div>
-                            {hasElectricBill ? (
-                                <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 text-[10px] px-1.5">
-                                    Attiva
-                                </Badge>
-                            ) : (
-                                <Badge variant="outline" className="bg-muted text-muted-foreground text-[10px] px-1.5">
-                                    Mancante
-                                </Badge>
-                            )}
-                        </div>
-                        <h3 className="font-semibold text-sm">Luce</h3>
-                        {hasElectricBill ? (
-                            <p className="text-xs text-muted-foreground mt-1">Analisi completata</p>
-                        ) : (
-                            <p className="text-xs text-primary font-medium mt-1">Carica bolletta →</p>
+            {/* Dashboard Content */}
+            {!loading && (
+                <>
+                    {/* Fullscreen Game/Loader */}
+                    <AnimatePresence>
+                        {currentStep === 2 && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[60]"
+                            >
+                                <AnalyzingLoader
+                                    isAnalysisComplete={analysisComplete}
+                                    onAnalysisComplete={handleGameComplete}
+                                />
+                            </motion.div>
                         )}
-                    </Card>
-                </ScrollReveal>
+                    </AnimatePresence>
 
-                <ScrollReveal delay={150}>
-                    <Card
-                        className="p-4 border-l-4 border-l-orange-500/30 cursor-pointer hover:shadow-md transition-all"
-                        onClick={() => navigate('/utilities')}
-                    >
-                        <div className="flex justify-between items-start mb-2">
-                            <div className="p-2 rounded-full bg-orange-500/10">
-                                <Flame className="h-5 w-5 text-orange-500" />
-                            </div>
-                            <Badge variant="outline" className="bg-muted text-muted-foreground text-[10px] px-1.5">
-                                Prossimamente
-                            </Badge>
+                    {/* Header Section */}
+                    <div className="flex flex-col gap-2 pt-2 px-1">
+                        <div className="flex items-center gap-2 mb-1 text-primary font-medium text-xs uppercase tracking-wider">
+                            <Sparkles className="h-3 w-3" />
+                            <span>Dashboard</span>
                         </div>
-                        <h3 className="font-semibold text-sm">Gas</h3>
-                        <p className="text-xs text-muted-foreground mt-1">In arrivo</p>
-                    </Card>
-                </ScrollReveal>
-            </div>
-
-            {/* Gamification Summary */}
-            <ScrollReveal delay={200}>
-                <Card className="p-4 bg-gradient-to-r from-background to-primary/5 border-primary/20">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-full bg-yellow-500/10">
-                                <Award className="h-6 w-6 text-yellow-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">I tuoi Punti Karica</p>
-                                <h3 className="text-2xl font-bold text-foreground">
-                                    <AnimatedStat end={points} />
-                                </h3>
-                            </div>
-                        </div>
-                        <Button variant="ghost" size="sm" onClick={() => navigate('/gamification')} className="text-xs">
-                            Vedi premi <ChevronRight className="h-3 w-3 ml-1" />
-                        </Button>
+                        <h1 className="text-3xl font-light text-foreground leading-tight">
+                            Ciao <span className="font-medium text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-600">{userName}</span>
+                        </h1>
                     </div>
-                </Card>
-            </ScrollReveal>
 
-            {/* Quick Actions / CTA Grid */}
-            <h3 className="text-lg font-semibold mt-4 mb-2">Azioni Rapide</h3>
-            <div className="grid grid-cols-1 gap-3">
-                <ScrollReveal delay={250}>
-                    <Card className="p-4 flex items-center gap-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate('/cer')}>
-                        <div className="h-10 w-10 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
-                            <Users className="h-5 w-5 text-accent" />
-                        </div>
-                        <div className="flex-1">
-                            <h4 className="font-semibold text-sm">Unisciti alla CER</h4>
-                            <p className="text-xs text-muted-foreground">Scopri la Comunità Energetica della tua zona</p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </Card>
-                </ScrollReveal>
-
-                <ScrollReveal delay={300}>
-                    <Card className="p-4 flex items-center gap-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate('/interventions')}>
-                        <div className="h-10 w-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
-                            <Wrench className="h-5 w-5 text-secondary" />
-                        </div>
-                        <div className="flex-1">
-                            <h4 className="font-semibold text-sm">Interventi di Efficienza</h4>
-                            <p className="text-xs text-muted-foreground">Migliora la tua classe energetica</p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </Card>
-                </ScrollReveal>
-
-                {!hasElectricBill && (
-                    <ScrollReveal delay={350}>
-                        <Card className="p-4 flex items-center gap-4 cursor-pointer hover:bg-muted/50 transition-colors border-primary/30 bg-primary/5" onClick={() => setBillDialogOpen(true)}>
-                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                <Upload className="h-5 w-5 text-primary" />
+                    {/* Bento Grid Layout */}
+                    <BentoGrid>
+                        {/* 1. Points & Gamification (Featured) */}
+                        <BentoCard
+                            featured={true}
+                            title="Il tuo Livello"
+                            subtitle="Continua a risparmiare per salire di grado"
+                            icon={<Award className="h-5 w-5" />}
+                            onClick={() => {
+                                triggerHaptic('selection'); // Feedback on click
+                                navigate('/gamification');
+                            }}
+                            className="bg-gradient-to-br from-background to-secondary/5 dark:from-[#203149] dark:to-[#0C86C7]/20 border-secondary/20"
+                            renderVisual={() => <Award className="w-48 h-48 text-[#0C86C7] translate-x-10 translate-y-10 rotate-12" />}
+                        >
+                            <div className="mt-4">
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-5xl font-bold text-foreground">
+                                        <NumberTicker value={points} />
+                                    </span>
+                                    <span className="text-sm uppercase font-medium text-muted-foreground">Punti Karica</span>
+                                </div>
+                                <div className="mt-4 flex gap-2">
+                                    <Badge variant="secondary" className="bg-[#45FF4A]/20 text-[#45FF4A] border border-[#45FF4A]/20 shadow-sm hover:bg-[#45FF4A]/30">
+                                        Eco-Warrior
+                                    </Badge>
+                                </div>
                             </div>
-                            <div className="flex-1">
-                                <h4 className="font-semibold text-sm text-primary">Carica Bolletta Luce</h4>
-                                <p className="text-xs text-muted-foreground">Ottieni un'analisi gratuita dei consumi</p>
+                        </BentoCard>
+
+                        {/* 2. Electric Bill (Consumi) */}
+                        {!hasElectricBill ? (
+                            <BentoCard
+                                title="La tua Luce"
+                                subtitle="Scopri quanto puoi risparmiare"
+                                icon={<Upload className="h-5 w-5" />}
+                                onClick={() => setBillDialogOpen(true)}
+                                className="bg-primary/5 border-primary/20"
+                            >
+                                <div className="mt-2 flex flex-col items-start gap-4 h-full justify-between">
+                                    <p className="text-sm text-muted-foreground">Carica la tua bolletta: l'AI analizzerà i costi per te in pochi secondi.</p>
+                                    <Button size="sm" className="w-full bg-[#45FF4A] text-[#203149] hover:bg-[#45FF4A]/90">
+                                        Analizza ora
+                                    </Button>
+                                </div>
+                            </BentoCard>
+                        ) : (
+                            <BentoCard
+                                title="La tua Luce"
+                                subtitle="Analisi intelligente"
+                                icon={<Zap className="h-5 w-5" />}
+                                onClick={() => {
+                                    triggerHaptic('selection');
+                                    navigate('/utilities');
+                                }}
+                                className="group"
+                            >
+                                <div className="mt-2 space-y-1 relative">
+                                    <p className="text-[10px] uppercase text-muted-foreground font-medium">Spesa prevista (Anno)</p>
+                                    <div className="flex items-end justify-between">
+                                        <div>
+                                            <p className="text-2xl font-bold text-foreground">
+                                                {lastBillData?.annual_consumption_projected
+                                                    ? <NumberTicker value={Math.round(lastBillData.annual_consumption_projected * (lastBillData.price_kwh || 0.25))} currency={true} />
+                                                    : "€ --"}
+                                            </p>
+                                            <div className="flex items-center gap-1 text-emerald-600 text-xs font-medium mt-2">
+                                                <TrendingDown className="h-3 w-3" />
+                                                <span>Puoi risparmiare!</span>
+                                            </div>
+                                        </div>
+                                        <div className="h-12 w-24 opacity-60 group-hover:opacity-100 transition-opacity">
+                                            <Sparkline
+                                                data={[40, 35, 55, 45, 30, 35, 20]}
+                                                width={96}
+                                                height={48}
+                                                color="#45FF4A"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </BentoCard>
+                        )}
+
+
+
+                        {/* 3. Gas (Placeholder) */}
+                        <BentoCard
+                            title="Il tuo Gas"
+                            subtitle="In arrivo"
+                            icon={<Flame className="h-5 w-5" />}
+                            className="opacity-75"
+                        >
+                            <div className="mt-2 flex flex-col h-full justify-end">
+                                <p className="text-xs text-muted-foreground">Stiamo lavorando per aiutarti a risparmiare anche sul gas.</p>
                             </div>
-                            <ChevronRight className="h-4 w-4 text-primary" />
-                        </Card>
-                    </ScrollReveal>
-                )}
-            </div>
+                        </BentoCard>
 
-            {/* Incentives / Info Section */}
-            <ScrollReveal delay={400}>
-                <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-card to-muted border border-border">
-                    <div className="flex items-start gap-3">
-                        <Info className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-                        <div>
-                            <h4 className="font-semibold text-sm mb-1">Lo sapevi?</h4>
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                                Sono disponibili nuovi incentivi statali per l'installazione di pompe di calore e fotovoltaico.
-                                <span className="font-medium text-foreground cursor-pointer hover:underline ml-1" onClick={() => navigate('/interventions')}>
-                                    Scopri se ne hai diritto
-                                </span>.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </ScrollReveal>
+                        {/* 4. Upgrade (Interventions) */}
+                        <BentoCard
+                            title="Migliora Casa"
+                            subtitle="Fotovoltaico & Efficienza"
+                            icon={<Wrench className="h-5 w-5" />}
+                            onClick={() => navigate('/interventions')}
+                        >
+                            <div className="mt-2">
+                                <div className="flex items-center gap-2 mb-2 text-green-600 font-medium text-xs bg-green-500/10 p-1.5 rounded w-fit">
+                                    <Info className="h-3 w-3" />
+                                    <span>Ecobonus 2026</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">Scopri come aumentare il valore della tua casa.</p>
+                            </div>
+                        </BentoCard>
 
-            {/* Bill Upload Dialog */}
-            <Dialog open={billDialogOpen} onOpenChange={setBillDialogOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Carica Bolletta</DialogTitle>
-                    </DialogHeader>
-                    <BillUpload onUpload={handleBillUpload} onSkip={() => setBillDialogOpen(false)} loading={billLoading} />
-                </DialogContent>
-            </Dialog>
+                        {/* 5. CER (Community) */}
+                        <BentoCard
+                            title="La tua Community"
+                            subtitle="Energia Condivisa"
+                            icon={<HeroIcon icon={Users} color="#A855F7" />}
+                            onClick={() => navigate('/cer')}
+                            className="md:col-span-2"
+                        >
+                            <div className="mt-2 flex justify-between items-center">
+                                <p className="text-sm text-muted-foreground max-w-[200px]">Unisciti ai tuoi vicini: condividi energia pulita e guadagna insieme.</p>
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#0C86C7] to-cyan-400 flex items-center justify-center text-white shadow-lg">
+                                    <Users className="h-5 w-5" />
+                                </div>
+                            </div>
+                        </BentoCard>
+
+                    </BentoGrid>
+
+                    {/* Bill Upload Dialog */}
+                    <Dialog open={billDialogOpen} onOpenChange={setBillDialogOpen}>
+                        <DialogContent className="max-w-md">
+                            <DialogHeader>
+                                <DialogTitle>Carica Bolletta</DialogTitle>
+                            </DialogHeader>
+                            <BillUpload onUpload={handleBillUpload} onSkip={() => setBillDialogOpen(false)} loading={billLoading} />
+                        </DialogContent>
+                    </Dialog>
+                </>
+            )}
         </div>
     );
 }

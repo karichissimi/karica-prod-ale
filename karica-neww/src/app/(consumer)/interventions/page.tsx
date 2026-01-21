@@ -177,15 +177,25 @@ const Interventions = () => {
         const typeMap: Record<string, string> = {
             'heating_replacement': 'Pompa di Calore',
             'heating': 'Pompa di Calore',
+            'heat_pump': 'Pompa di Calore', // Potential variation
             'window_replacement': 'Sostituzione Infissi',
             'windows': 'Sostituzione Infissi',
+            'fixtures': 'Sostituzione Infissi', // Potential variation
             'insulation': 'Isolamento Termico',
             'solar_panels': 'Pannelli Solari',
             'solar': 'Pannelli Solari',
+            'photovoltaic': 'Pannelli Solari', // Potential variation
             'battery': 'Batterie di Accumulo',
+            'storage': 'Batterie di Accumulo', // Potential variation
             'audit': 'Audit Energetico'
         };
-        return typeMap[recType] || null;
+        if (!recType || typeof recType !== 'string') return null;
+        // If exact match fails, try case-insensitive or return known values if they match
+        const mapped = typeMap[recType] || typeMap[recType.toLowerCase()];
+
+        // Final fallback: if the type implies something specific but isn't mapped, 
+        // return the type itself if it matches a known Italian name (rare but possible)
+        return mapped || null;
     };
 
     // Handle dialog close - reset preselected intervention
@@ -197,7 +207,8 @@ const Interventions = () => {
     };
 
     const handleRecommendationClick = (rec: Recommendation) => {
-        const interventionName = getInterventionTypeFromRecommendation(rec.type);
+        const interventionName = getInterventionTypeFromRecommendation(rec.type) || rec.title || rec.type;
+        console.log('Opening dialog for:', interventionName, '(Original type:', rec.type, ')');
         setPreselectedIntervention(interventionName);
         setDialogOpen(true);
     };
@@ -379,8 +390,8 @@ const Interventions = () => {
                             <Card key={index} className="p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleRecommendationClick(rec)}>
                                 <div className="flex items-start gap-4">
                                     <div className={`p-3 rounded-lg ${rec.priority === 'high' ? 'bg-destructive/10 text-destructive' :
-                                            rec.priority === 'medium' ? 'bg-primary/10 text-primary' :
-                                                'bg-muted text-muted-foreground'
+                                        rec.priority === 'medium' ? 'bg-primary/10 text-primary' :
+                                            'bg-muted text-muted-foreground'
                                         }`}>
                                         {getInterventionIcon(rec.type)}
                                     </div>

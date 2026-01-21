@@ -136,6 +136,9 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
             console.log('Calling analyze-bill edge function with JSON payload...');
 
             const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+            console.log('DEBUG: Target Supabase URL:', supabaseUrl);
+            console.log('DEBUG: User ID:', session.user.id);
+            console.log('DEBUG: Token starts with:', session.access_token.substring(0, 10) + '...');
 
             const response = await fetch(
                 `${supabaseUrl}/functions/v1/analyze-bill`,
@@ -152,12 +155,14 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
             console.log('Response status:', response.status);
 
             if (!response.ok) {
-                let errorMessage = 'Errore analisi bolletta';
+                const rawText = await response.text();
+                console.error('Analysis failed:', response.status, rawText);
+                let errorMessage = `Errore ${response.status}: `;
                 try {
-                    const error = await response.json();
-                    errorMessage = error.error || errorMessage;
+                    const json = JSON.parse(rawText);
+                    errorMessage += json.error || (json.message ? json.message : rawText.substring(0, 100));
                 } catch {
-                    errorMessage = response.statusText || errorMessage;
+                    errorMessage += rawText.substring(0, 200) || response.statusText;
                 }
                 throw new Error(errorMessage);
             }

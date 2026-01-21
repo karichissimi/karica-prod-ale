@@ -127,11 +127,19 @@ export const BillUpload = ({ onUpload, onSkip, loading }: BillUploadProps) => {
             </Card>
           </div>
         ) : (
-          <Card className="border-2 border-primary bg-card w-full overflow-hidden">
-            <CardContent className="p-4 sm:p-6">
+          <Card className="border-2 border-primary bg-card w-full overflow-hidden relative">
+            {loading && (
+              <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden rounded-lg">
+                {/* Scanning Beam */}
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#45FF4A] to-transparent opacity-50 shadow-[0_0_15px_#45FF4A] animate-[scan_2s_ease-in-out_infinite]" />
+                {/* Energy Particles (simplified as a gradient overlay pulse) */}
+                <div className="absolute inset-0 bg-gradient-to-b from-[#45FF4A]/5 to-transparent animate-pulse" />
+              </div>
+            )}
+            <CardContent className="p-4 sm:p-6 relative z-0">
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                  <FileText className={`h-5 w-5 sm:h-6 sm:w-6 text-primary ${loading ? 'animate-pulse' : ''}`} />
                 </div>
                 <div className="flex-1 min-w-0 grid gap-0.5">
                   <p className="font-semibold text-foreground truncate text-sm sm:text-base leading-none" title={selectedFile.name}>

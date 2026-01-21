@@ -6,8 +6,8 @@ import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Camera, FileText, Home, Flame, CheckCircle2, 
+import {
+  Camera, FileText, Home, Flame, CheckCircle2,
   AlertCircle, Loader2, ArrowRight, ArrowLeft, Sparkles, Upload, Ruler,
   RefreshCw, ThermometerSun, Calendar, Zap, Edit2
 } from "lucide-react";
@@ -70,7 +70,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
   useEffect(() => {
     const checkExistingBill = async () => {
       if (!open || !user) return;
-      
+
       setCheckingExistingBill(true);
       try {
         const { data, error } = await supabase
@@ -80,7 +80,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
-        
+
         if (!error && data && data.ocr_data) {
           setExistingBill(data);
         } else {
@@ -93,7 +93,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
         setCheckingExistingBill(false);
       }
     };
-    
+
     checkExistingBill();
   }, [open, user]);
 
@@ -145,9 +145,9 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
   // Use existing bill data for analysis
   const handleUseExistingBill = async () => {
     if (!existingBill?.ocr_data || !user) return;
-    
+
     setIsAnalyzing(true);
-    
+
     try {
       // Create analysis record
       const { data: newAnalysis, error } = await supabase
@@ -155,30 +155,30 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
         .insert({ user_id: user.id, status: 'analyzing' })
         .select('id')
         .single();
-      
+
       if (error) throw error;
-      
+
       const currentAnalysisId = newAnalysis.id;
       setAnalysisId(currentAnalysisId);
-      
+
       // Set bill data from existing bill
       setStepData(prev => ({
         ...prev,
         billAnalysis: existingBill.ocr_data,
       }));
-      
+
       // Update home_analysis with bill data
       await supabase
         .from('home_analysis')
-        .update({ 
+        .update({
           bill_analysis: existingBill.ocr_data,
           updated_at: new Date().toISOString()
         })
         .eq('id', currentAnalysisId);
-      
+
       toast.success('Bolletta caricata!');
       setStep('bill_confirm');
-      
+
     } catch (error) {
       console.error('Error using existing bill:', error);
       toast.error('Errore nel caricamento. Riprova.');
@@ -208,7 +208,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-    
+
     if (diffMins < 60) return `${diffMins} minuti fa`;
     if (diffHours < 24) return `${diffHours} ore fa`;
     if (diffDays === 1) return 'ieri';
@@ -232,7 +232,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
     const fileExtension = file.name.toLowerCase().split('.').pop();
     const isValidByExtension = ['pdf', 'jpg', 'jpeg', 'png'].includes(fileExtension || '');
-    
+
     if (!validTypes.includes(file.type) && !isValidByExtension) {
       toast.error('Formato non supportato. Usa PDF, JPG o PNG.');
       return;
@@ -248,15 +248,15 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
     // by reading it as ArrayBuffer first
     try {
       toast.info('Caricamento file in corso...');
-      
+
       // Read file to ensure it's fully downloaded from cloud
       const arrayBuffer = await file.arrayBuffer();
-      
+
       if (arrayBuffer.byteLength === 0) {
         toast.error('File vuoto. Riprova.');
         return;
       }
-      
+
       // Determine MIME type
       let mimeType = file.type;
       if (!mimeType || mimeType === 'application/octet-stream') {
@@ -264,10 +264,10 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
         else if (fileExtension === 'jpg' || fileExtension === 'jpeg') mimeType = 'image/jpeg';
         else if (fileExtension === 'png') mimeType = 'image/png';
       }
-      
+
       // Create a new File from the loaded buffer to ensure consistency
       const loadedFile = new File([arrayBuffer], file.name, { type: mimeType });
-      
+
       // Process the fully loaded file
       await processFile(loadedFile);
     } catch (error) {
@@ -293,7 +293,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
           .insert({ user_id: user.id, status: 'analyzing' })
           .select('id')
           .single();
-        
+
         if (error) throw error;
         currentAnalysisId = newAnalysis.id;
         setAnalysisId(currentAnalysisId);
@@ -305,7 +305,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
 
       const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-bill`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analisi-bolletta-luce`,
         {
           method: 'POST',
           headers: {
@@ -321,7 +321,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
       }
 
       const result = await response.json();
-      
+
       setStepData(prev => ({
         ...prev,
         billImage: file,
@@ -332,7 +332,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
       if (currentAnalysisId) {
         await supabase
           .from('home_analysis')
-          .update({ 
+          .update({
             bill_analysis: result.data,
             updated_at: new Date().toISOString()
           })
@@ -353,7 +353,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
 
   const handleCapture = async (blob: Blob) => {
     const file = new File([blob], `${currentCaptureType}_${Date.now()}.jpg`, { type: 'image/jpeg' });
-    
+
     setCameraOpen(false);
 
     // For bill, reuse processFile
@@ -373,7 +373,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
           .insert({ user_id: user.id, status: 'analyzing' })
           .select('id')
           .single();
-        
+
         if (error) throw error;
         currentAnalysisId = newAnalysis.id;
         setAnalysisId(currentAnalysisId);
@@ -398,7 +398,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
       );
 
       const result = await response.json();
-      
+
       // Check for invalid image response
       if (!response.ok || result.error === 'invalid_image') {
         const errorMessage = result.message || result.error || 'Errore analisi';
@@ -409,7 +409,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
         // Don't throw - let user retry
         return;
       }
-      
+
       if (currentCaptureType === 'heating') {
         setStepData(prev => ({
           ...prev,
@@ -461,7 +461,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
       if (error) throw error;
 
       // Import recommendations engine
-      const { generateRecommendations, calculateCombinedEnergyClass, calculateExtraCostYearly, calculateDetails } = 
+      const { generateRecommendations, calculateCombinedEnergyClass, calculateExtraCostYearly, calculateDetails } =
         await import('@/lib/recommendations-engine');
 
       // Cast JSON types to proper interfaces
@@ -516,7 +516,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
 
       clearInterval(progressInterval);
       setAnalysisProgress(100);
-      
+
       setTimeout(() => {
         setStep('results');
       }, 500);
@@ -567,7 +567,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
           .insert({ user_id: user.id, status: 'analyzing' })
           .select('id')
           .single();
-        
+
         if (error) throw error;
         currentAnalysisId = newAnalysis.id;
         setAnalysisId(currentAnalysisId);
@@ -583,7 +583,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
       if (currentAnalysisId) {
         await supabase
           .from('home_analysis')
-          .update({ 
+          .update({
             heating_analysis: data as unknown as any,
             updated_at: new Date().toISOString()
           })
@@ -612,7 +612,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
           .insert({ user_id: user.id, status: 'analyzing' })
           .select('id')
           .single();
-        
+
         if (error) throw error;
         currentAnalysisId = newAnalysis.id;
         setAnalysisId(currentAnalysisId);
@@ -628,7 +628,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
       if (currentAnalysisId) {
         await supabase
           .from('home_analysis')
-          .update({ 
+          .update({
             external_analysis: data as unknown as any,
             updated_at: new Date().toISOString()
           })
@@ -680,10 +680,10 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
         const currentIndex = getCurrentStepIndex();
         const isActive = index === currentIndex;
         const isCompleted = index < currentIndex;
-        
+
         return (
           <div key={s.id} className="flex items-center">
-            <div 
+            <div
               className={`
                 flex items-center justify-center w-10 h-10 rounded-full transition-all
                 ${isActive ? 'bg-primary text-primary-foreground scale-110' : ''}
@@ -698,10 +698,9 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
               )}
             </div>
             {index < steps.length - 1 && (
-              <div 
-                className={`w-8 h-0.5 mx-1 transition-colors ${
-                  isCompleted ? 'bg-secondary' : 'bg-muted'
-                }`} 
+              <div
+                className={`w-8 h-0.5 mx-1 transition-colors ${isCompleted ? 'bg-secondary' : 'bg-muted'
+                  }`}
               />
             )}
           </div>
@@ -763,7 +762,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                         );
                       })}
                     </div>
-                    
+
                     <Card className="p-4 bg-secondary/10 border-secondary/20">
                       <p className="text-sm text-secondary flex items-start gap-2">
                         <Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0" />
@@ -816,9 +815,9 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                 </Card>
 
                 <div className="grid gap-3">
-                  <Button 
-                    className="w-full" 
-                    size="lg" 
+                  <Button
+                    className="w-full"
+                    size="lg"
                     onClick={handleUseExistingBill}
                     disabled={isAnalyzing}
                   >
@@ -829,9 +828,9 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                     )}
                     Usa questa bolletta
                   </Button>
-                  
-                  <Button 
-                    variant="outline" 
+
+                  <Button
+                    variant="outline"
                     className="w-full"
                     onClick={handleUploadNewBill}
                     disabled={isAnalyzing}
@@ -841,8 +840,8 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                   </Button>
                 </div>
 
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="w-full"
                   onClick={() => setStep('heating')}
                   disabled={isAnalyzing}
@@ -862,15 +861,15 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                 ) : (
                   <>
                     <div className="grid grid-cols-2 gap-3">
-                      <Card 
+                      <Card
                         className="p-6 flex flex-col items-center justify-center gap-3 border-dashed cursor-pointer hover:bg-muted/50 transition-colors"
                         onClick={() => handleStartCapture('bill')}
                       >
                         <Camera className="h-10 w-10 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground text-center">Scatta foto</p>
                       </Card>
-                      
-                      <Card 
+
+                      <Card
                         className="p-6 flex flex-col items-center justify-center gap-3 border-dashed cursor-pointer hover:bg-muted/50 transition-colors"
                         onClick={handleFileUpload}
                       >
@@ -878,13 +877,13 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                         <p className="text-sm text-muted-foreground text-center">Carica PDF</p>
                       </Card>
                     </div>
-                    
+
                     <p className="text-xs text-muted-foreground text-center">
                       Cerca il POD e i consumi annuali sulla bolletta
                     </p>
                   </>
                 )}
-                
+
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -893,8 +892,8 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                   onChange={handleFileChange}
                 />
 
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="w-full"
                   onClick={handleSkipStep}
                   disabled={isAnalyzing}
@@ -913,19 +912,19 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                     ...prev,
                     billAnalysis: { ...prev.billAnalysis, ...updatedData }
                   }));
-                  
+
                   // Also update the home_analysis record if we have an analysisId
                   if (analysisId) {
                     supabase
                       .from('home_analysis')
-                      .update({ 
+                      .update({
                         bill_analysis: { ...stepData.billAnalysis, ...updatedData },
                         updated_at: new Date().toISOString()
                       })
                       .eq('id', analysisId)
                       .then(() => console.log('Bill analysis updated'));
                   }
-                  
+
                   toast.success('Dati bolletta confermati!');
                   setStep('heating');
                 }}
@@ -935,7 +934,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
 
             {step === 'heating' && (
               <>
-                <Card 
+                <Card
                   className="p-8 flex flex-col items-center justify-center gap-4 border-dashed cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => handleStartCapture('heating')}
                 >
@@ -964,8 +963,8 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                   <div className="flex-1 border-t border-border" />
                 </div>
 
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full"
                   onClick={() => setStep('heating_questionnaire')}
                   disabled={isAnalyzing}
@@ -979,8 +978,8 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Indietro
                   </Button>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     className="flex-1"
                     onClick={handleSkipStep}
                     disabled={isAnalyzing}
@@ -992,7 +991,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
             )}
 
             {step === 'heating_questionnaire' && (
-              <HeatingQuestionnaire 
+              <HeatingQuestionnaire
                 onComplete={handleHeatingQuestionnaireComplete}
                 onBack={() => setStep('heating')}
                 isLoading={isAnalyzing}
@@ -1007,8 +1006,8 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                   </p>
                 </Card>
 
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   size="lg"
                   onClick={() => setStep('external_questionnaire')}
                   disabled={isAnalyzing}
@@ -1024,7 +1023,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                   <div className="flex-1 border-t border-border" />
                 </div>
 
-                <Card 
+                <Card
                   className="p-4 flex items-center justify-center gap-3 border-dashed cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => handleStartCapture('external')}
                 >
@@ -1048,8 +1047,8 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Indietro
                   </Button>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     className="flex-1"
                     onClick={handleSkipStep}
                     disabled={isAnalyzing}
@@ -1061,7 +1060,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
             )}
 
             {step === 'external_questionnaire' && (
-              <BuildingQuestionnaire 
+              <BuildingQuestionnaire
                 onComplete={handleBuildingQuestionnaireComplete}
                 onBack={() => setStep('external')}
                 isLoading={isAnalyzing}
@@ -1077,7 +1076,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                     </div>
                     <div>
                       <h3 className="font-semibold text-lg">
-                        {stepData.heatingAnalysis.brand || 'Impianto'} 
+                        {stepData.heatingAnalysis.brand || 'Impianto'}
                         {stepData.heatingAnalysis.model && ` ${stepData.heatingAnalysis.model}`}
                       </h3>
                       <p className="text-sm text-muted-foreground">Dati rilevati dall'immagine</p>
@@ -1215,7 +1214,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                       Superficie calpestabile approssimativa
                     </p>
                   </div>
-                  
+
                   <Slider
                     value={[stepData.squareMeters || 100]}
                     min={40}
@@ -1224,12 +1223,12 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                     onValueChange={(value) => setStepData(prev => ({ ...prev, squareMeters: value[0] }))}
                     className="py-4"
                   />
-                  
+
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>40 m²</span>
                     <span>250 m²</span>
                   </div>
-                  
+
                   <div className="flex flex-wrap gap-2 justify-center">
                     {[60, 80, 100, 120, 150].map((size) => (
                       <Button
@@ -1243,7 +1242,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                     ))}
                   </div>
                 </Card>
-                
+
                 <p className="text-xs text-muted-foreground text-center">
                   La superficie serve per calcolare la classe energetica (kWh/m²/anno)
                 </p>
@@ -1253,7 +1252,7 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Indietro
                   </Button>
-                  <Button 
+                  <Button
                     className="flex-1"
                     onClick={() => analysisId && runFinalAnalysis(analysisId)}
                     disabled={!stepData.squareMeters}
@@ -1276,9 +1275,9 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
                   </div>
                   <p className="font-medium">Elaborazione AI in corso...</p>
                 </div>
-                
+
                 <Progress value={analysisProgress} className="h-2" />
-                
+
                 <div className="text-sm text-muted-foreground text-center space-y-1">
                   {analysisProgress < 30 && <p>Analizzando i consumi...</p>}
                   {analysisProgress >= 30 && analysisProgress < 60 && <p>Valutando l'efficienza impianto...</p>}
@@ -1300,8 +1299,8 @@ export const SnapSolveFlow = ({ open, onOpenChange }: SnapSolveFlowProps) => {
       />
 
       {step === 'results' && analysisId && (
-        <SnapSolveResults 
-          open={true} 
+        <SnapSolveResults
+          open={true}
           onOpenChange={onOpenChange}
           analysisId={analysisId}
         />

@@ -14,7 +14,8 @@ interface CERConsentsData {
 export const useCEROnboarding = () => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
   const [cerEligible, setCerEligible] = useState(false);
   const [cerOnboardingCompleted, setCerOnboardingCompleted] = useState(false);
   const [consents, setConsents] = useState<CERConsentsData>({
@@ -74,6 +75,9 @@ export const useCEROnboarding = () => {
       }
     } catch (error) {
       console.error('Error checking CER status:', error);
+    } finally {
+      setLoading(false);
+      setInitialCheckDone(true);
     }
   };
 
@@ -84,9 +88,9 @@ export const useCEROnboarding = () => {
       setLoading(true);
       const { error } = await supabase
         .from('profiles')
-        .update({ 
+        .update({
           cer_onboarding_started_at: new Date().toISOString(),
-          cer_eligible: true 
+          cer_eligible: true
         })
         .eq('id', user.id);
 
@@ -136,9 +140,9 @@ export const useCEROnboarding = () => {
   };
 
   const completeStrongID = async (method: string) => {
-    await updateConsents({ 
-      strongIdCompleted: true, 
-      strongIdMethod: method 
+    await updateConsents({
+      strongIdCompleted: true,
+      strongIdMethod: method
     });
   };
 
@@ -185,5 +189,6 @@ export const useCEROnboarding = () => {
     updateConsents,
     completeStrongID,
     completeCEROnboarding,
+    initialCheckDone,
   };
 };

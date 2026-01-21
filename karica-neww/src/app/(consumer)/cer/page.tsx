@@ -20,7 +20,20 @@ const CER = () => {
         updateConsents,
         completeStrongID,
         completeCEROnboarding,
+        initialCheckDone,
     } = useCEROnboarding();
+
+    // Show loading state while checking initial status
+    if (loading && !initialCheckDone) {
+        return (
+            <div className="max-w-2xl mx-auto p-5">
+                <div className="space-y-4 animate-pulse">
+                    <div className="h-10 bg-muted rounded-lg w-3/4 mx-auto"></div>
+                    <div className="h-64 bg-muted rounded-xl"></div>
+                </div>
+            </div>
+        );
+    }
 
     // If CER onboarding is completed, show the dashboard
     if (cerOnboardingCompleted) {
